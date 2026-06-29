@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:path_provider/path_provider.dart';
+import 'dart:io' show Platform;
 import '../services/torrent_service.dart';
 
 class AppState with ChangeNotifier {
   ThemeMode _themeMode = ThemeMode.system;
-  String _defaultSavePath = '/storage/emulated/0/Download/DirXplore';
+  String _defaultSavePath = '';
   int _maxConcurrentDownloads = 1;
   String _appVersion = 'Unknown';
   bool _initialized = false;
@@ -66,13 +68,27 @@ class AppState with ChangeNotifier {
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
 
+    // Set platform-appropriate default save path
+    if (_defaultSavePath.isEmpty) {
+      if (Platform.isAndroid) {
+        _defaultSavePath = '/storage/emulated/0/Download/DirXplore';
+      } else {
+        try {
+          final dir = await getApplicationDocumentsDirectory();
+          _defaultSavePath = '${dir.path}/DirXplore';
+        } catch (_) {
+          _defaultSavePath = '/storage/emulated/0/Download/DirXplore';
+        }
+      }
+    }
+
     // Load Theme
     final tIdx = prefs.getInt('themeMode') ?? ThemeMode.system.index;
     _themeMode = ThemeMode.values[tIdx];
 
     // Load Settings
     _defaultSavePath =
-        prefs.getString('savePath') ?? '/storage/emulated/0/Download/DirXplore';
+        prefs.getString('savePath') ?? _defaultSavePath;
     _maxConcurrentDownloads = prefs.getInt('maxConcurrent') ?? 1;
 
     // Load Added Feature Toggles

@@ -483,7 +483,7 @@ class SettingsTab extends StatelessWidget {
                             mode: LaunchMode.externalApplication);
                         Navigator.pop(ctx);
                       },
-                      child: Text(Platform.isAndroid ? 'Download APK' : 'Download'),
+                      child: Text(Platform.isAndroid ? 'Download APK' : 'Download from GitHub'),
                     )
                   ],
                 ));
