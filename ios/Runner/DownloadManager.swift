@@ -213,7 +213,7 @@ class DownloadManager: NSObject {
         }
     }
 
-    private func endAllLiveActivities() {
+    func endAllLiveActivities() {
         guard #available(iOS 16.2, *), liveActivityEnabled else { return }
         for (_, activity) in liveActivities {
             Task {
@@ -222,6 +222,7 @@ class DownloadManager: NSObject {
         }
         liveActivities.removeAll()
     }
+}
 
 extension DownloadManager: URLSessionDownloadDelegate {
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
