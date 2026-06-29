@@ -76,6 +76,14 @@ import UIKit
                     result(FlutterError(code: "INVALID_ARGS", message: "Missing path", details: nil))
                 }
 
+            case "openURL":
+                if let args = call.arguments as? [String: Any],
+                   let urlStr = args["url"] as? String,
+                   let url = URL(string: urlStr) {
+                    UIApplication.shared.open(url)
+                }
+                result(nil)
+
             default:
                 result(FlutterMethodNotImplemented)
             }
@@ -114,6 +122,28 @@ import UIKit
             case "isEnabled":
                 result(DownloadManager.shared.liveActivityEnabled)
 
+            default:
+                result(FlutterMethodNotImplemented)
+            }
+        }
+
+        let proxyChannel = FlutterMethodChannel(
+            name: "com.dirxplore/proxy_config",
+            binaryMessenger: controller.binaryMessenger
+        )
+
+        proxyChannel.setMethodCallHandler { (call, result) in
+            switch call.method {
+            case "setProxy":
+                if let args = call.arguments as? [String: Any] {
+                    let host = args["host"] as? String ?? ""
+                    let port = args["port"] as? Int ?? 0
+                    let username = args["username"] as? String ?? ""
+                    let password = args["password"] as? String ?? ""
+                    let enabled = args["enabled"] as? Bool ?? false
+                    DownloadManager.shared.setProxy(host: host, port: port, username: username, password: password, enabled: enabled)
+                }
+                result(nil)
             default:
                 result(FlutterMethodNotImplemented)
             }

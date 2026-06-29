@@ -1,3 +1,4 @@
+import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:sqflite/sqflite.dart';
@@ -83,6 +84,11 @@ class AppProxyProvider with ChangeNotifier {
     final active = activeProxy;
     DioClient().setProxy(active);
 
+    // Sync proxy config to iOS native downloader
+    if (Platform.isIOS) {
+      _syncProxyToIOS(active);
+    }
+
     notifyListeners();
   }
 
@@ -128,6 +134,20 @@ class AppProxyProvider with ChangeNotifier {
     await _db!.update('proxies', {'isActive': active ? 1 : 0},
         where: 'id = ?', whereArgs: [id]);
     await _loadProxies();
+  }
+
+  static const MethodChannel _iosProxyChannel =
+      MethodChannel('com.dirxplore/proxy_config');
+
+  void _syncProxyToIOS(ProxyModel? proxy) {
+    _iosProxyChannel.invokeMethod('setProxy', {
+      'host': proxy?.host ?? '',
+      'port': proxy?.port ?? 0,
+      'username': proxy?.username ?? '',
+      'password': proxy?.password ?? '',
+      'protocol': proxy?.protocol.name ?? '',
+      'enabled': proxy?.isActive ?? false,
+    }).catchError((e) { debugPrint('syncProxyToIOS error: $e'); });
   }
 
   Future<void> testProxyLatency(ProxyModel proxy) async {

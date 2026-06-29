@@ -15,6 +15,11 @@ class DownloadManager: NSObject {
     private var retryCountMap: [String: Int] = [:]
     private var downloadUrlMap: [String: String] = [:]
     private let maxRetries = 3
+    private var proxyHost: String = ""
+    private var proxyPort: Int = 0
+    private var proxyUsername: String = ""
+    private var proxyPassword: String = ""
+    private var proxyEnabled: Bool = false
     private var liveActivities: [String: Activity<DownloadActivityAttributes>] = [:]
     var liveActivityEnabled: Bool = true
 
@@ -37,6 +42,21 @@ class DownloadManager: NSObject {
 
     private override init() {
         super.init()
+        backgroundSession = createSession()
+    }
+
+    func setProxy(host: String, port: Int, username: String, password: String, enabled: Bool) {
+        proxyHost = host
+        proxyPort = port
+        proxyUsername = username
+        proxyPassword = password
+        proxyEnabled = enabled
+        let newSession = createSession()
+        backgroundSession.invalidateAndCancel()
+        backgroundSession = newSession
+    }
+
+    private func createSession() -> URLSession {
         let config = URLSessionConfiguration.background(withIdentifier: "com.dirxplore.background.download")
         config.isDiscretionary = false
         config.sessionSendsLaunchEvents = true
@@ -46,7 +66,19 @@ class DownloadManager: NSObject {
             config.allowsExpensiveNetworkAccess = true
             config.allowsConstrainedNetworkAccess = true
         }
-        backgroundSession = URLSession(configuration: config, delegate: self, delegateQueue: nil)
+        if proxyEnabled && !proxyHost.isEmpty && proxyPort > 0 {
+            var proxyDict: [String: Any] = [
+                "SOCKSEnable": 1,
+                "SOCKSProxy": proxyHost,
+                "SOCKSPort": proxyPort,
+            ]
+            if !proxyUsername.isEmpty {
+                proxyDict["SOCKSUser"] = proxyUsername
+                proxyDict["SOCKSPassword"] = proxyPassword
+            }
+            config.connectionProxyDictionary = proxyDict
+        }
+        return URLSession(configuration: config, delegate: self, delegateQueue: nil)
     }
 
     func startDownload(url: String, fileName: String, downloadId: String, saveDir: String? = nil) {

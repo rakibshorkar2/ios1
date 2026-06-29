@@ -1,6 +1,7 @@
 import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
@@ -12,7 +13,6 @@ import '../services/proxy_tunnel.dart';
 import '../services/haptic_service.dart';
 import 'package:android_intent_plus/android_intent.dart';
 import 'package:android_intent_plus/flag.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'media_player_screen.dart';
 import 'download_preview_screen.dart';
 
@@ -102,6 +102,11 @@ class _BrowserTabState extends State<BrowserTab> {
                       visualDensity: VisualDensity.compact,
                       icon: const Icon(Icons.search, size: 20),
                       onPressed: () { HapticService.light(); browserState.loadUrl(_urlCtrl.text); },
+                    ),
+                    IconButton(
+                      visualDensity: VisualDensity.compact,
+                      icon: const Icon(Icons.refresh, size: 20),
+                      onPressed: () { HapticService.light(); browserState.loadUrl(browserState.currentUrl); },
                     ),
                   ],
                 ),
@@ -780,8 +785,9 @@ class _BrowserTabState extends State<BrowserTab> {
                   }
                 } else if (Platform.isIOS) {
                   try {
-                    final vlcUrl = Uri.parse('vlc://${Uri.encodeQueryComponent(tunnelUrl)}');
-                    await launchUrl(vlcUrl, mode: LaunchMode.externalApplication);
+                    // Use native channel to bypass Uri.parse mangling of vlc:// scheme
+                    const iosChannel = MethodChannel('com.dirxplore/ios_download');
+                    await iosChannel.invokeMethod('openURL', {'url': 'vlc://$tunnelUrl'});
                   } catch (_) {
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
