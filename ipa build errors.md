@@ -1,13 +1,27 @@
 Run flutter build ios --release --no-codesign
 Warning: Building for device with codesigning disabled. You will have to manually codesign before deploying to device.
-Xcode failed to resolve Swift Package Manager dependencies:
-2026-06-29 12:34:12.836 xcodebuild[3479:19267] Error Domain=NSCocoaErrorDomain Code=3840 "JSON text did not start with array or object and option to allow fragments not set. around line 1, column 0." UserInfo={NSDebugDescription=JSON text did not start with array or object and option to allow fragments not set. around line 1, column 0., NSJSONSerializationErrorIndex=0}
-2026-06-29 12:34:12.845 xcodebuild[3479:19267] Writing error result bundle to /var/folders/mn/js5hmsy13552y330w_94s79h0000gn/T/ResultBundle_2026-29-06_12-34-0012.xcresult
-xcodebuild: error: Unable to read project 'Runner.xcodeproj'.
-	Reason: The project ‘Runner’ is damaged and cannot be opened due to a parse error. Examine the project file for invalid edits or unresolved source control conflicts.
-
-Path: /Users/runner/work/ios1/ios1/ios/Runner.xcodeproj
-
-
-
+Building com.example.dirBrowser for device (ios-release)...
+Adding Swift Package Manager integration...                        34.5s
+The following plugins do not support Swift Package Manager for ios:
+  - flutter_background_service_ios
+  - flutter_inappwebview_ios
+  - flutter_local_notifications
+  - media_kit_libs_ios_video
+  - media_kit_video
+  - permission_handler_apple
+  - screen_brightness_ios
+  - volume_controller
+  - workmanager_apple
+This will become an error in a future version of Flutter. Please contact the plugin maintainers to request Swift Package Manager adoption.
+Running pod install...                                             21.8s
+Running Xcode build...                                          
+Xcode build done.                                           98.7s
+Failed to build iOS app
+Swift Compiler Error (Xcode): Extra trailing closures at positions #3, #4 in call
+/Users/runner/work/ios1/ios1/ios/WidgetExtension/DownloadLiveActivity.swift:23:35
+Swift Compiler Error (Xcode): Cannot convert return expression of type 'DynamicIslandExpandedRegion<some View>' to return type 'DynamicIslandExpandedContent<_>'
+/Users/runner/work/ios1/ios1/ios/WidgetExtension/DownloadLiveActivity.swift:23:8
+Swift Compiler Error (Xcode): Underlying type for opaque result type 'DynamicIslandExpandedContent<some View>' could not be inferred from return expression
+/Users/runner/work/ios1/ios1/ios/WidgetExtension/DownloadLiveActivity.swift:23:8
+Encountered error while building for device.
 Error: Process completed with exit code 1.

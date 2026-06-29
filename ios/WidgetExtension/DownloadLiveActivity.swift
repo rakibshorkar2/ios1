@@ -9,44 +9,38 @@ struct DownloadLiveActivity: Widget {
             LockScreenView(context: context)
         } dynamicIsland: { context in
             DynamicIsland {
-                expandedContent(context: context)
+                DynamicIslandExpandedRegion(.leading) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(context.state.fileName)
+                            .font(.caption)
+                            .lineLimit(1)
+                            .foregroundColor(.white)
+                        Text(context.state.status)
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.leading, 4)
+                }
+                DynamicIslandExpandedRegion(.trailing) {
+                    Text(context.state.totalBytes > 0
+                        ? "\(Int(context.state.progress * 100))%"
+                        : "...")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
+                }
+                DynamicIslandExpandedRegion(.bottom) {
+                    ProgressView(value: context.state.progress)
+                        .tint(.blue)
+                        .padding(.horizontal, 8)
+                        .padding(.bottom, 4)
+                }
             } compactLeading: {
                 compactLeadingView(context: context)
             } compactTrailing: {
                 compactTrailingView(context: context)
             } minimal: {
                 minimalView(context: context)
-            }
-        }
-    }
-
-    private func expandedContent(context: ActivityViewContext<DownloadActivityAttributes>) -> DynamicIslandExpandedContent<some View> {
-        DynamicIslandExpandedRegion(.leading) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(context.state.fileName)
-                    .font(.caption)
-                    .lineLimit(1)
-                    .foregroundColor(.white)
-                Text(context.state.status)
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-            }
-            .padding(.leading, 4)
-        } content: {
-            DynamicIslandExpandedRegion(.trailing) {
-                Text(context.state.totalBytes > 0
-                    ? "\(Int(context.state.progress * 100))%"
-                    : "...")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .foregroundColor(.white)
-            }
-        } content: {
-            DynamicIslandExpandedRegion(.bottom) {
-                ProgressView(value: context.state.progress)
-                    .tint(.blue)
-                    .padding(.horizontal, 8)
-                    .padding(.bottom, 4)
             }
         }
     }
