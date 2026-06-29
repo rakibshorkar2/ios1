@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_displaymode/flutter_displaymode.dart';
@@ -6,12 +7,18 @@ import 'package:dynamic_color/dynamic_color.dart';
 import 'dart:ui';
 import 'dart:async';
 import 'dart:io' show Platform;
+
 import 'package:local_auth/local_auth.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:workmanager/workmanager.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'screens/pin_lock_screen.dart';
+import 'screens/browser_tab.dart';
+import 'screens/download_tab.dart';
+import 'screens/proxy_tab.dart';
+import 'screens/settings_tab.dart';
+import 'screens/torrent_tab.dart';
 
 import 'providers/app_state.dart';
 import 'providers/proxy_provider.dart';
@@ -20,30 +27,16 @@ import 'providers/browser_provider.dart';
 import 'providers/torrent_provider.dart';
 import 'services/proxy_tunnel.dart';
 import 'services/haptic_service.dart';
-import 'models/download_item.dart';
-
-import 'screens/browser_tab.dart';
-import 'screens/download_tab.dart';
-import 'screens/proxy_tab.dart';
-import 'screens/settings_tab.dart';
-import 'screens/torrent_tab.dart';
 
 @pragma('vm:entry-point')
 void callbackDispatcher() {
   Workmanager().executeTask((task, inputData) async {
-    // This runs in an isolate, we need to initialize bindings again
     WidgetsFlutterBinding.ensureInitialized();
 
     if (task == 'autoResumeDownloads') {
-      // Just a dummy initialization of DownloadProvider to trigger its queue processing
-      // Since it's a new isolate, it will load SharedPreferences, see what's paused,
-      // and if it was paused due to no-wifi/battery, and conditions are met now,
-      // it will resume them when _processQueue is called.
-
       final dummyProvider = DownloadProvider();
       await dummyProvider.init();
 
-      // Wait a bit to ensure async processing starts
       await Future.delayed(const Duration(seconds: 10));
       return true;
     }
@@ -59,18 +52,15 @@ void main() async {
     debugPrint('MediaKit initialization failed: $e');
   }
 
-  Workmanager().initialize(
-    callbackDispatcher,
-  );
+  Workmanager().initialize(callbackDispatcher);
 
-  // Register the task to run periodically (e.g., every 15 mins when network is connected)
   Workmanager().registerPeriodicTask(
     "auto-resume-task",
     "autoResumeDownloads",
     frequency: const Duration(minutes: 15),
     constraints: Constraints(
-      networkType: NetworkType.connected, // Only run if we have network
-      requiresBatteryNotLow: true, // Don't run if battery is low
+      networkType: NetworkType.connected,
+      requiresBatteryNotLow: true,
     ),
   );
 
@@ -93,7 +83,6 @@ void main() async {
   final torrentProvider = TorrentProvider();
   await torrentProvider.init();
 
-  // Start the localhost proxy tunnel for external video players
   await ProxyTunnel().start();
 
   runApp(
@@ -184,11 +173,9 @@ class OpenDirApp extends StatelessWidget {
         ColorScheme darkScheme;
 
         if (lightDynamic != null && darkDynamic != null) {
-          // On Android 12+, use Material You / Dynamic Colors
           lightScheme = lightDynamic.harmonized();
           darkScheme = darkDynamic.harmonized();
         } else {
-          // Fallback to default colors
           lightScheme = ColorScheme.fromSeed(seedColor: Colors.blueAccent);
           darkScheme = ColorScheme.fromSeed(
             seedColor: Colors.deepPurple,
@@ -196,13 +183,12 @@ class OpenDirApp extends StatelessWidget {
           );
         }
 
-        // Apply True AMOLED Black if requested
         if (appState.trueAmoledDark && appState.themeMode != ThemeMode.light) {
           darkScheme = darkScheme.copyWith(
             surface: Colors.black,
             surfaceContainerLowest: Colors.black,
             surfaceContainerLow: Colors.black,
-            surfaceContainer: const Color(0xFF0D1117), // Very subtle contrast
+            surfaceContainer: const Color(0xFF0D1117),
             surfaceContainerHigh: const Color(0xFF161B22),
             surfaceContainerHighest: const Color(0xFF1C2128),
           );
@@ -213,9 +199,20 @@ class OpenDirApp extends StatelessWidget {
           themeMode: appState.themeMode,
           theme: ThemeData.light(useMaterial3: true).copyWith(
             colorScheme: lightScheme,
+            cupertinoOverrideTheme: const CupertinoThemeData(
+              textTheme: CupertinoTextThemeData(
+                primaryColor: CupertinoColors.activeBlue,
+              ),
+            ),
           ),
           darkTheme: ThemeData.dark(useMaterial3: true).copyWith(
             colorScheme: darkScheme,
+            cupertinoOverrideTheme: const CupertinoThemeData(
+              brightness: Brightness.dark,
+              textTheme: CupertinoTextThemeData(
+                primaryColor: CupertinoColors.activeBlue,
+              ),
+            ),
             scaffoldBackgroundColor: (appState.trueAmoledDark &&
                     appState.themeMode != ThemeMode.light)
                 ? Colors.black
@@ -278,104 +275,32 @@ class _MainLayoutState extends State<MainLayout> {
           return;
         }
 
-        // Exit app
-        Navigator.pop(
-            context); // Optional depending on router but generally system channel is better:
+        Navigator.pop(context);
         SystemNavigator.pop();
       },
-      child: Scaffold(
-        body: Stack(
-          children: [
-            IndexedStack(
-              index: _currentIndex,
-              children: _tabs,
-            ),
-            // const FloatingDownloadBubble(), // Removed per user request
-            _buildFloatingNavBar(context),
+      child: CupertinoTabScaffold(
+        tabBar: CupertinoTabBar(
+          currentIndex: _currentIndex,
+          onTap: (index) {
+            HapticService.light();
+            setState(() => _currentIndex = index);
+          },
+          activeColor: Theme.of(context).colorScheme.primary,
+          inactiveColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+          backgroundColor: Theme.of(context).colorScheme.surface.withValues(alpha: 0.9),
+          items: const [
+            BottomNavigationBarItem(icon: Icon(Icons.explore), label: 'Browser'),
+            BottomNavigationBarItem(icon: Icon(Icons.download), label: 'Downloads'),
+            BottomNavigationBarItem(icon: Icon(Icons.security), label: 'Proxy'),
+            BottomNavigationBarItem(icon: Icon(Icons.cloud_download), label: 'Torrents'),
+            BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'Settings'),
           ],
         ),
-        bottomNavigationBar: null,
-      ),
-    );
-  }
-
-  Widget _buildFloatingNavBar(BuildContext context) {
-    return Positioned(
-      bottom: 16,
-      left: 12,
-      right: 12,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(30),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: Container(
-            height: 65,
-            decoration: BoxDecoration(
-              color:
-                  Theme.of(context).colorScheme.surface.withValues(alpha: 0.5),
-              borderRadius: BorderRadius.circular(30),
-              border: Border.all(
-                color: Theme.of(context)
-                    .colorScheme
-                    .outline
-                    .withValues(alpha: 0.2),
-                width: 1.5,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.1),
-                  blurRadius: 10,
-                  spreadRadius: 1,
-                ),
-              ],
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _buildNavItem(icon: Icons.explore, label: 'Browser', index: 0),
-                _buildNavItem(
-                    icon: Icons.download, label: 'Downloads', index: 1),
-                _buildNavItem(icon: Icons.security, label: 'Proxy', index: 2),
-                _buildNavItem(
-                    icon: Icons.cloud_download, label: 'Torrents', index: 3),
-                _buildNavItem(
-                    icon: Icons.settings, label: 'Settings', index: 4),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNavItem(
-      {required IconData icon, required String label, required int index}) {
-    final isSelected = _currentIndex == index;
-    final color = isSelected
-        ? Theme.of(context).colorScheme.primary
-        : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6);
-
-    return InkWell(
-      onTap: () {
-        HapticService.light();
-        setState(() => _currentIndex = index);
-      },
-      customBorder: const CircleBorder(),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: color, size: isSelected ? 26 : 24),
-            const SizedBox(height: 2),
-            Text(label,
-                style: TextStyle(
-                    color: color,
-                    fontSize: 10,
-                    fontWeight:
-                        isSelected ? FontWeight.bold : FontWeight.normal)),
-          ],
-        ),
+        tabBuilder: (context, index) {
+          return CupertinoTabView(
+            builder: (context) => _tabs[index],
+          );
+        },
       ),
     );
   }
@@ -393,7 +318,7 @@ class _BiometricLockWrapperState extends State<BiometricLockWrapper>
     with WidgetsBindingObserver {
   bool _isAuthenticated = false;
   bool _isAuthenticating = false;
-  DateTime? _lastAuthSuccessTime; // Added for cool-down
+  DateTime? _lastAuthSuccessTime;
   Timer? _inactivityTimer;
   final LocalAuthentication _auth = LocalAuthentication();
 
@@ -418,9 +343,6 @@ class _BiometricLockWrapperState extends State<BiometricLockWrapper>
     if (state == AppLifecycleState.resumed) {
       final appState = Provider.of<AppState>(context, listen: false);
 
-      // If we are already authenticated, check if we should show the lock screen again
-      // 1. Skip if we are currently in middle of an auth prompt.
-      // 2. Skip if we just successfully authenticated (cool-down to ignore redundant dialog close events).
       if (appState.lockType != 'none' &&
           _isAuthenticated &&
           !_isAuthenticating) {
@@ -429,7 +351,6 @@ class _BiometricLockWrapperState extends State<BiometricLockWrapper>
             : const Duration(hours: 1);
 
         if (timeSinceLastAuth > const Duration(seconds: 3)) {
-          // Only lock if we were away and lock is immediate
           if (appState.autoLockSeconds == 0) {
             setState(() => _isAuthenticated = false);
             _checkAuth();
@@ -444,8 +365,6 @@ class _BiometricLockWrapperState extends State<BiometricLockWrapper>
       }
     } else if (state == AppLifecycleState.paused) {
       final appState = Provider.of<AppState>(context, listen: false);
-      // Immediately lock ONLY if auto-lock is set to Immediate and we're NOT authenticating.
-      // This prevents locking when the fingerprint prompt itself causes a partial pause/resume cycle.
       if (appState.lockType != 'none' &&
           appState.autoLockSeconds == 0 &&
           !_isAuthenticating) {
@@ -477,7 +396,6 @@ class _BiometricLockWrapperState extends State<BiometricLockWrapper>
     }
 
     if (appState.lockType == 'custom') {
-      // PinLockScreen handles its own auth
       return;
     }
 
@@ -502,7 +420,7 @@ class _BiometricLockWrapperState extends State<BiometricLockWrapper>
         localizedReason: 'Please authenticate to access DirXplore',
         options: const AuthenticationOptions(
           stickyAuth: true,
-          biometricOnly: false, // Allows PIN/Pattern/Face
+          biometricOnly: false,
         ),
       );
 
@@ -514,8 +432,6 @@ class _BiometricLockWrapperState extends State<BiometricLockWrapper>
           }
         });
 
-        // CRITICAL: Keep _isAuthenticating true for a short duration to ignore
-        // redundant lifecycle events firing right after the dialog closes.
         await Future.delayed(const Duration(milliseconds: 800));
 
         if (mounted) {
@@ -531,7 +447,7 @@ class _BiometricLockWrapperState extends State<BiometricLockWrapper>
       debugPrint('Biometric Error: $e');
       if (mounted) {
         setState(() {
-          _isAuthenticated = true; // Fallback
+          _isAuthenticated = true;
           _isAuthenticating = false;
         });
         _resetInactivityTimer();
@@ -560,7 +476,6 @@ class _BiometricLockWrapperState extends State<BiometricLockWrapper>
       );
     }
 
-    // Locked Screen
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: Stack(
@@ -604,88 +519,5 @@ class _BiometricLockWrapperState extends State<BiometricLockWrapper>
         ],
       ),
     );
-  }
-}
-
-class FloatingDownloadBubble extends StatelessWidget {
-  const FloatingDownloadBubble({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Consumer<DownloadProvider>(builder: (context, provider, child) {
-      final activeItems = provider.queue
-          .where((i) => i.status == DownloadStatus.downloading)
-          .toList();
-      if (activeItems.isEmpty) return const SizedBox.shrink();
-
-      final totalActive = activeItems.length;
-      double totalProgress = 0;
-      for (var item in activeItems) {
-        totalProgress += item.progress;
-      }
-      final avgProgress =
-          totalActive > 0 ? (totalProgress / totalActive) / 100 : 0.0;
-
-      return Positioned(
-        bottom: 90,
-        right: 16,
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: () {},
-            customBorder: const CircleBorder(),
-            child: Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Theme.of(context).colorScheme.primaryContainer,
-                boxShadow: const [
-                  BoxShadow(
-                      color: Colors.black26,
-                      blurRadius: 8,
-                      offset: Offset(0, 4))
-                ],
-              ),
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  SizedBox(
-                    width: 56,
-                    height: 56,
-                    child: CircularProgressIndicator(
-                      value: avgProgress,
-                      backgroundColor: Colors.transparent,
-                      color: Theme.of(context).colorScheme.primary,
-                      strokeWidth: 3,
-                    ),
-                  ),
-                  const Icon(Icons.downloading, size: 28),
-                  if (totalActive > 1)
-                    Positioned(
-                      top: 8,
-                      right: 8,
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: const BoxDecoration(
-                          color: Colors.red,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Text(
-                          '$totalActive',
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      );
-    });
   }
 }

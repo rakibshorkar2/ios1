@@ -1,11 +1,13 @@
 import 'dart:io';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
 import '../providers/download_provider.dart';
 import '../models/download_item.dart';
 import '../services/thumbnail_service.dart';
 import '../services/haptic_service.dart';
+import 'package:share_plus/share_plus.dart';
 
 class DownloadTab extends StatefulWidget {
   const DownloadTab({super.key});
@@ -209,24 +211,28 @@ class _DownloadTabState extends State<DownloadTab> {
   }
 
   void _confirmClearDone(BuildContext context, DownloadProvider dlProvider) {
-    showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-                title: const Text('Clear Finished Tasks?'),
-                content: const Text(
-                    'This will remove completed and failed tasks from the list.'),
-                actions: [
-                  TextButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      child: const Text('Cancel')),
-                  TextButton(
-                      onPressed: () {
-                        dlProvider.clearDone();
-                        Navigator.pop(ctx);
-                      },
-                      child: const Text('Clear List',
-                          style: TextStyle(color: Colors.red))),
-                ]));
+    showCupertinoDialog(
+      context: context,
+      builder: (ctx) => CupertinoAlertDialog(
+        title: const Text('Clear Finished Tasks?'),
+        content: const Text('This will remove completed and failed tasks from the list.'),
+        actions: [
+          CupertinoDialogAction(
+            isDefaultAction: true,
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          CupertinoDialogAction(
+            isDestructiveAction: true,
+            onPressed: () {
+              dlProvider.clearDone();
+              Navigator.pop(ctx);
+            },
+            child: const Text('Clear List'),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildBatchTile(BuildContext context, DownloadProvider dlProvider,
@@ -323,41 +329,59 @@ class _DownloadTabState extends State<DownloadTab> {
 
   void _showBatchOptions(BuildContext context, DownloadProvider dlProvider,
       String batchId, List<DownloadItem> items) {
-    showModalBottomSheet(
+    showCupertinoModalPopup(
       context: context,
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.play_circle),
-              title: const Text('Resume All in Batch'),
-              onTap: () {
-                HapticService.medium();
-                dlProvider.resumeBatch(batchId);
-                Navigator.pop(context);
-              },
+      builder: (context) => CupertinoActionSheet(
+        title: const Text('Batch Actions'),
+        actions: [
+          CupertinoActionSheetAction(
+            onPressed: () {
+              HapticService.medium();
+              dlProvider.resumeBatch(batchId);
+              Navigator.pop(context);
+            },
+            child: const Row(
+              children: [
+                Icon(Icons.play_circle, color: CupertinoColors.activeGreen, size: 22),
+                SizedBox(width: 12),
+                Text('Resume All in Batch'),
+              ],
             ),
-            ListTile(
-              leading: const Icon(Icons.pause_circle),
-              title: const Text('Pause All in Batch'),
-              onTap: () {
-                HapticService.medium();
-                dlProvider.pauseBatch(batchId);
-                Navigator.pop(context);
-              },
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () {
+              HapticService.medium();
+              dlProvider.pauseBatch(batchId);
+              Navigator.pop(context);
+            },
+            child: const Row(
+              children: [
+                Icon(Icons.pause_circle, color: CupertinoColors.systemOrange, size: 22),
+                SizedBox(width: 12),
+                Text('Pause All in Batch'),
+              ],
             ),
-            ListTile(
-              leading: const Icon(Icons.delete_sweep, color: Colors.red),
-              title: const Text('Remove Batch',
-                  style: TextStyle(color: Colors.red)),
-              onTap: () {
-                HapticService.heavy();
-                Navigator.pop(context);
-                _confirmRemoveBatch(context, dlProvider, batchId);
-              },
+          ),
+          CupertinoActionSheetAction(
+            isDestructiveAction: true,
+            onPressed: () {
+              HapticService.heavy();
+              Navigator.pop(context);
+              _confirmRemoveBatch(context, dlProvider, batchId);
+            },
+            child: const Row(
+              children: [
+                Icon(Icons.delete_sweep, color: CupertinoColors.destructiveRed, size: 22),
+                SizedBox(width: 12),
+                Text('Remove Batch'),
+              ],
             ),
-          ],
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          isDefaultAction: true,
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
         ),
       ),
     );
@@ -365,23 +389,24 @@ class _DownloadTabState extends State<DownloadTab> {
 
   void _confirmRemoveBatch(
       BuildContext context, DownloadProvider dlProvider, String batchId) {
-    showDialog(
+    showCupertinoDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
+      builder: (ctx) => CupertinoAlertDialog(
         title: const Text('Remove Batch?'),
-        content: const Text(
-            'Are you sure you want to remove all items in this batch?'),
+        content: const Text('Are you sure you want to remove all items in this batch?'),
         actions: [
-          TextButton(
+          CupertinoDialogAction(
+            isDefaultAction: true,
             onPressed: () => Navigator.pop(ctx),
             child: const Text('Cancel'),
           ),
-          TextButton(
+          CupertinoDialogAction(
+            isDestructiveAction: true,
             onPressed: () {
               dlProvider.stopBatch(batchId);
               Navigator.pop(ctx);
             },
-            child: const Text('Remove', style: TextStyle(color: Colors.red)),
+            child: const Text('Remove'),
           ),
         ],
       ),
@@ -574,6 +599,21 @@ class _DownloadTabState extends State<DownloadTab> {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
+        if (item.status == DownloadStatus.done)
+          IconButton(
+            icon: const Icon(Icons.share, color: CupertinoColors.activeBlue, size: 18),
+            onPressed: () {
+              HapticService.light();
+              final file = File(item.savePath);
+              if (file.existsSync()) {
+                Share.shareXFiles([XFile(item.savePath)], text: item.fileName);
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('File not found on disk.')),
+                );
+              }
+            },
+          ),
         if (item.status == DownloadStatus.downloading ||
             item.status == DownloadStatus.queued)
           IconButton(
@@ -597,35 +637,42 @@ class _DownloadTabState extends State<DownloadTab> {
   void _confirmSafeDelete(
       BuildContext context, DownloadProvider dlProvider, DownloadItem item) {
     bool deleteFile = false;
-    showDialog(
+    showCupertinoDialog(
         context: context,
         builder: (ctx) {
           return StatefulBuilder(builder: (context, setState) {
-            return AlertDialog(
+            return CupertinoAlertDialog(
                 title: const Text('Delete Task?'),
                 content: Column(
-                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
                         'Are you sure you want to remove "${item.fileName}" from the queue?'),
                     const SizedBox(height: 10),
-                    CheckboxListTile(
-                      title: const Text('Delete file from storage as well',
-                          style: TextStyle(fontSize: 13)),
-                      value: deleteFile,
-                      controlAffinity: ListTileControlAffinity.leading,
-                      contentPadding: EdgeInsets.zero,
-                      onChanged: (val) {
-                        setState(() => deleteFile = val ?? false);
-                      },
-                    )
+                    Row(
+                      children: [
+                        CupertinoCheckbox(
+                          value: deleteFile,
+                          onChanged: (val) {
+                            setState(() => deleteFile = val ?? false);
+                          },
+                        ),
+                        const SizedBox(width: 8),
+                        const Flexible(
+                          child: Text('Delete file from storage as well',
+                              style: TextStyle(fontSize: 13)),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
                 actions: [
-                  TextButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      child: const Text('Cancel')),
-                  TextButton(
+                  CupertinoDialogAction(
+                    isDefaultAction: true,
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('Cancel'),
+                  ),
+                  CupertinoDialogAction(
+                    isDestructiveAction: true,
                     onPressed: () {
                       dlProvider.stop(item.id);
                       if (deleteFile) {
@@ -634,9 +681,8 @@ class _DownloadTabState extends State<DownloadTab> {
                       }
                       Navigator.pop(ctx);
                     },
-                    child: const Text('Delete',
-                        style: TextStyle(color: Colors.red)),
-                  )
+                    child: const Text('Delete'),
+                  ),
                 ]);
           });
         });
@@ -645,42 +691,48 @@ class _DownloadTabState extends State<DownloadTab> {
   void _confirmDeleteSelected(
       BuildContext context, DownloadProvider dlProvider) {
     bool deleteFile = false;
-    showDialog(
+    showCupertinoDialog(
         context: context,
         builder: (ctx) {
           return StatefulBuilder(builder: (context, setState) {
-            return AlertDialog(
+            return CupertinoAlertDialog(
               title: const Text('Delete Selected?'),
               content: Column(
-                mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
                       'Are you sure you want to remove ${dlProvider.selectedIds.length} items?'),
                   const SizedBox(height: 10),
-                  CheckboxListTile(
-                    title: const Text('Delete files from storage as well',
-                        style: TextStyle(fontSize: 13)),
-                    value: deleteFile,
-                    controlAffinity: ListTileControlAffinity.leading,
-                    contentPadding: EdgeInsets.zero,
-                    onChanged: (val) {
-                      setState(() => deleteFile = val ?? false);
-                    },
-                  )
+                  Row(
+                    children: [
+                      CupertinoCheckbox(
+                        value: deleteFile,
+                        onChanged: (val) {
+                          setState(() => deleteFile = val ?? false);
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      const Flexible(
+                        child: Text('Delete files from storage as well',
+                            style: TextStyle(fontSize: 13)),
+                      ),
+                    ],
+                  ),
                 ],
               ),
               actions: [
-                TextButton(
-                    onPressed: () => Navigator.pop(ctx),
-                    child: const Text('Cancel')),
-                TextButton(
+                CupertinoDialogAction(
+                  isDefaultAction: true,
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Cancel'),
+                ),
+                CupertinoDialogAction(
+                  isDestructiveAction: true,
                   onPressed: () {
                     dlProvider.deleteSelected(deleteFiles: deleteFile);
                     Navigator.pop(ctx);
                   },
-                  child:
-                      const Text('Delete', style: TextStyle(color: Colors.red)),
-                )
+                  child: const Text('Delete'),
+                ),
               ],
             );
           });
@@ -693,28 +745,24 @@ class _DownloadTabState extends State<DownloadTab> {
     bool isVerifying = false;
     bool? isValid;
 
-    showDialog(
+    showCupertinoDialog(
         context: context,
         barrierDismissible: false,
         builder: (ctx) {
           return StatefulBuilder(builder: (context, setState) {
-            return AlertDialog(
+            return CupertinoAlertDialog(
               title: const Text('Verify File Hash'),
               content: Column(
-                mainAxisSize: MainAxisSize.min,
                 children: [
                   Text('Check MD5 or SHA256 for: ${item.fileName}',
                       style: const TextStyle(fontSize: 12)),
                   const SizedBox(height: 10),
-                  TextField(
+                  CupertinoTextField(
                     controller: ctrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Expected Hash',
-                      border: OutlineInputBorder(),
-                    ),
+                    placeholder: 'Expected Hash',
                   ),
                   const SizedBox(height: 10),
-                  if (isVerifying) const CircularProgressIndicator(),
+                  if (isVerifying) const CupertinoActivityIndicator(),
                   if (!isVerifying && isValid != null)
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -732,11 +780,13 @@ class _DownloadTabState extends State<DownloadTab> {
               ),
               actions: [
                 if (!isVerifying)
-                  TextButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      child: const Text('Close')),
+                  CupertinoDialogAction(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('Close'),
+                  ),
                 if (!isVerifying)
-                  ElevatedButton(
+                  CupertinoDialogAction(
+                    isDefaultAction: true,
                     onPressed: () async {
                       if (ctrl.text.trim().isEmpty) return;
                       setState(() {
@@ -755,7 +805,7 @@ class _DownloadTabState extends State<DownloadTab> {
                       }
                     },
                     child: const Text('Verify'),
-                  )
+                  ),
               ],
             );
           });

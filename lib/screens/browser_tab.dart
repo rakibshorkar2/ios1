@@ -1,5 +1,6 @@
 import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
@@ -11,6 +12,7 @@ import '../services/proxy_tunnel.dart';
 import '../services/haptic_service.dart';
 import 'package:android_intent_plus/android_intent.dart';
 import 'package:android_intent_plus/flag.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'media_player_screen.dart';
 import 'download_preview_screen.dart';
 
@@ -340,12 +342,12 @@ class _BrowserTabState extends State<BrowserTab> {
                                                   InkWell(
                                                     onTap: () {
                                                       final videoFiles = browserState.items.where((i) => !i.isDirectory && _isPlayableMedia(i.name)).toList();
-                                                      final playlist = videoFiles.map((i) => { 'url': ProxyTunnel().getTunnelUrl(i.url), 'title': i.name }).toList();
-                                                      final initialIndex = videoFiles.indexWhere((i) => i.url == item.url);
+    final playlist = videoFiles.map((i) => <String, String>{ 'url': ProxyTunnel().getTunnelUrl(i.url), 'title': i.name }).toList();
+                                                       final initialIndex = videoFiles.indexWhere((i) => i.url == item.url);
                                                       
                                                       Navigator.push(
                                                           context,
-                                                          MaterialPageRoute(
+                                                          CupertinoPageRoute(
                                                             builder: (_) =>
                                                                 MediaPlayerScreen(
                                                                     url: playlist[initialIndex]['url']!,
@@ -467,7 +469,7 @@ class _BrowserTabState extends State<BrowserTab> {
                                                     .getTunnelUrl(item.url);
                                                 Navigator.push(
                                                     context,
-                                                    MaterialPageRoute(
+                                                    CupertinoPageRoute(
                                                       builder: (_) =>
                                                           MediaPlayerScreen(
                                                               url: tunnelUrl,
@@ -579,7 +581,7 @@ class _BrowserTabState extends State<BrowserTab> {
                       if (context.mounted) {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(
+                          CupertinoPageRoute(
                             builder: (context) => DownloadPreviewScreen(
                               folderUrl: item.url,
                               folderName: item.name,
@@ -719,136 +721,164 @@ class _BrowserTabState extends State<BrowserTab> {
     if (item.isDirectory) return;
 
     final bool isMedia = _isPlayableMedia(item.name);
+    final browserState = context.read<BrowserProvider>();
+    final videoFiles = isMedia ? browserState.items.where((i) => !i.isDirectory && _isPlayableMedia(i.name)).toList() : [];
+    final playlist = videoFiles.map((i) => <String, String>{ 'url': ProxyTunnel().getTunnelUrl(i.url), 'title': i.name }).toList();
+    final initialIndex = videoFiles.indexWhere((i) => i.url == item.url);
 
-    showModalBottomSheet(
-        context: context,
-        builder: (ctx) {
-          return SafeArea(
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              ListTile(
-                title: Text(item.name,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: const Text('Choose Action'),
+    showCupertinoModalPopup(
+      context: context,
+      builder: (ctx) => CupertinoActionSheet(
+        title: Text(item.name, maxLines: 2, overflow: TextOverflow.ellipsis),
+        message: const Text('Choose Action'),
+        actions: [
+          if (isMedia)
+            CupertinoActionSheetAction(
+              onPressed: () {
+                HapticService.medium();
+                Navigator.pop(ctx);
+                Navigator.push(
+                  context,
+                  CupertinoPageRoute(
+                    builder: (_) => MediaPlayerScreen(
+                      url: playlist.isNotEmpty ? playlist[initialIndex >= 0 ? initialIndex : 0]['url'] ?? item.url : item.url,
+                      title: item.name,
+                      playlist: playlist,
+                      initialIndex: initialIndex >= 0 ? initialIndex : 0,
+                    ),
+                  ),
+                );
+              },
+              child: const Row(
+                children: [
+                  Icon(Icons.play_circle_fill, color: CupertinoColors.activeBlue, size: 22),
+                  SizedBox(width: 12),
+                  Text('Play in App'),
+                ],
               ),
-              const Divider(height: 1),
-              if (isMedia)
-                ListTile(
-                  leading:
-                      const Icon(Icons.play_circle_fill, color: Colors.blue),
-                  title: const Text('Play in App'),
-                  onTap: () {
-                    HapticService.medium();
-                    Navigator.pop(ctx);
-                    final browserState = context.read<BrowserProvider>();
-                    final videoFiles = browserState.items.where((i) => !i.isDirectory && _isPlayableMedia(i.name)).toList();
-                    final playlist = videoFiles.map((i) => { 'url': ProxyTunnel().getTunnelUrl(i.url), 'title': i.name }).toList();
-                    final initialIndex = videoFiles.indexWhere((i) => i.url == item.url);
-                    
-                    Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => MediaPlayerScreen(
-                              url: playlist[initialIndex >= 0 ? initialIndex : 0]['url']!, 
-                              title: item.name,
-                              playlist: playlist.isNotEmpty ? playlist : null,
-                              initialIndex: initialIndex >= 0 ? initialIndex : 0,
-                          ),
-                        ));
-                  },
-                ),
-              if (isMedia && Platform.isAndroid)
-                ListTile(
-                  leading: const Icon(Icons.play_arrow, color: Colors.orange),
-                  title: const Text('Play with VLC'),
-                  onTap: () async {
-                    Navigator.pop(ctx);
-                    final tunnelUrl = ProxyTunnel().getTunnelUrl(item.url);
-                    try {
-                      final intent = AndroidIntent(
-                        action: 'action_view',
-                        package: 'org.videolan.vlc',
-                        data: tunnelUrl,
-                        type: 'video/*',
-                        flags: [Flag.FLAG_ACTIVITY_NEW_TASK],
-                      );
-                      await intent.launch();
-                    } catch (e) {
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                            content: Text(
-                                'VLC could not be launched. Ensure it is installed.')));
-                      }
-                    }
-                  },
-                ),
-              if (isMedia && Platform.isAndroid)
-                ListTile(
-                  leading:
-                      const Icon(Icons.play_arrow, color: Colors.deepPurple),
-                  title: const Text('Play with MX Player'),
-                  onTap: () async {
-                    Navigator.pop(ctx);
-                    final tunnelUrl = ProxyTunnel().getTunnelUrl(item.url);
-                    try {
-                      final intent = AndroidIntent(
-                        action: 'action_view',
-                        package: 'com.mxtech.videoplayer.ad',
-                        data: tunnelUrl,
-                        type: 'video/*',
-                        flags: [Flag.FLAG_ACTIVITY_NEW_TASK],
-                      );
-                      await intent.launch();
-                    } catch (e) {
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                            content: Text(
-                                'MX Player could not be launched. Ensure it is installed.')));
-                      }
-                    }
-                  },
-                ),
-              if (Platform.isAndroid)
-                ListTile(
-                leading: const Icon(Icons.download, color: Colors.green),
-                title: const Text('Download using 1DM'),
-                onTap: () async {
-                  Navigator.pop(ctx);
-                  final tunnelUrl = ProxyTunnel().getTunnelUrl(item.url);
+            ),
+          if (isMedia && (Platform.isAndroid || Platform.isIOS))
+            CupertinoActionSheetAction(
+              onPressed: () async {
+                Navigator.pop(ctx);
+                final tunnelUrl = ProxyTunnel().getTunnelUrl(item.url);
+                if (Platform.isAndroid) {
                   try {
                     final intent = AndroidIntent(
                       action: 'action_view',
-                      package: 'idm.internet.download.manager',
+                      package: 'org.videolan.vlc',
                       data: tunnelUrl,
+                      type: 'video/*',
                       flags: [Flag.FLAG_ACTIVITY_NEW_TASK],
                     );
                     await intent.launch();
                   } catch (e) {
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                          content: Text(
-                              '1DM could not be launched. Ensure it is installed.')));
+                          content: Text('VLC could not be launched. Ensure it is installed.')));
                     }
                   }
-                },
+                } else if (Platform.isIOS) {
+                  try {
+                    await launchUrl(Uri.parse('vlc://$tunnelUrl'),
+                        mode: LaunchMode.externalApplication);
+                  } catch (_) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                          content: Text('VLC for iOS is not installed.')));
+                    }
+                  }
+                }
+              },
+              child: const Row(
+                children: [
+                  Icon(Icons.play_arrow, color: CupertinoColors.activeOrange, size: 22),
+                  SizedBox(width: 12),
+                  Text('Play with VLC'),
+                ],
               ),
-              ListTile(
-                leading:
-                    const Icon(Icons.download_done, color: Colors.greenAccent),
-                title: const Text('Queue in App'),
-                onTap: () {
-                  HapticService.medium();
-                  Navigator.pop(ctx);
-                  context.read<BrowserProvider>().toggleSelection(item);
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                      content:
-                          Text('Selected, tap Queue Selected below to start')));
-                },
+            ),
+          if (isMedia && Platform.isAndroid)
+            CupertinoActionSheetAction(
+              onPressed: () async {
+                Navigator.pop(ctx);
+                final tunnelUrl = ProxyTunnel().getTunnelUrl(item.url);
+                try {
+                  final intent = AndroidIntent(
+                    action: 'action_view',
+                    package: 'com.mxtech.videoplayer.ad',
+                    data: tunnelUrl,
+                    type: 'video/*',
+                    flags: [Flag.FLAG_ACTIVITY_NEW_TASK],
+                  );
+                  await intent.launch();
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                        content: Text('MX Player could not be launched. Ensure it is installed.')));
+                  }
+                }
+              },
+              child: const Row(
+                children: [
+                  Icon(Icons.play_arrow, color: CupertinoColors.systemPurple, size: 22),
+                  SizedBox(width: 12),
+                  Text('Play with MX Player'),
+                ],
               ),
-            ]),
-          );
-        });
+            ),
+          if (Platform.isAndroid)
+            CupertinoActionSheetAction(
+              onPressed: () async {
+                Navigator.pop(ctx);
+                final tunnelUrl = ProxyTunnel().getTunnelUrl(item.url);
+                try {
+                  final intent = AndroidIntent(
+                    action: 'action_view',
+                    package: 'idm.internet.download.manager',
+                    data: tunnelUrl,
+                    flags: [Flag.FLAG_ACTIVITY_NEW_TASK],
+                  );
+                  await intent.launch();
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                        content: Text('1DM could not be launched. Ensure it is installed.')));
+                  }
+                }
+              },
+              child: const Row(
+                children: [
+                  Icon(Icons.download, color: CupertinoColors.activeGreen, size: 22),
+                  SizedBox(width: 12),
+                  Text('Download using 1DM'),
+                ],
+              ),
+            ),
+          CupertinoActionSheetAction(
+            onPressed: () {
+              HapticService.medium();
+              Navigator.pop(ctx);
+              context.read<BrowserProvider>().toggleSelection(item);
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                  content: Text('Selected, tap Queue Selected below to start')));
+            },
+            child: const Row(
+              children: [
+                Icon(Icons.download_done, color: CupertinoColors.activeGreen, size: 22),
+                SizedBox(width: 12),
+                Text('Queue in App'),
+              ],
+            ),
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          isDefaultAction: true,
+          onPressed: () => Navigator.pop(ctx),
+          child: const Text('Cancel'),
+        ),
+      ),
+    );
   }
 
   bool _isPlayableMedia(String filename) {
