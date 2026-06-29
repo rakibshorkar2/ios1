@@ -780,8 +780,8 @@ class _BrowserTabState extends State<BrowserTab> {
                   }
                 } else if (Platform.isIOS) {
                   try {
-                    await launchUrl(Uri.parse('vlc://$tunnelUrl'),
-                        mode: LaunchMode.externalApplication);
+                    final vlcUrl = Uri.parse('vlc://${Uri.encodeQueryComponent(tunnelUrl)}');
+                    await launchUrl(vlcUrl, mode: LaunchMode.externalApplication);
                   } catch (_) {
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(

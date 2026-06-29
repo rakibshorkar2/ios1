@@ -17,6 +17,7 @@ import '../models/download_item.dart';
 import '../services/dio_client.dart';
 import '../services/html_parser.dart';
 import '../services/database_helper.dart';
+import '../services/proxy_tunnel.dart';
 import '../models/directory_item.dart';
 
 class DownloadProvider with ChangeNotifier {
@@ -647,8 +648,10 @@ class DownloadProvider with ChangeNotifier {
 
     // iOS uses native URLSession background downloads
     if (_isIOS) {
+      // Route through the proxy tunnel so the download respects the active proxy
+      final tunnelUrl = ProxyTunnel().getTunnelUrl(item.url);
       _iosChannel.invokeMethod('startDownload', {
-        'url': item.url,
+        'url': tunnelUrl,
         'fileName': item.fileName,
         'downloadId': item.id,
         'saveDir': (File(item.savePath).parent).path,
