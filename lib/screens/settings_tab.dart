@@ -183,6 +183,19 @@ class SettingsTab extends StatelessWidget {
               const SizedBox(height: 16),
               _buildGlassSection(
                 context,
+                'HAPTICS & FEEDBACK',
+                [
+                  _buildGlassSwitchTile(
+                    title: 'Haptic Feedback',
+                    subtitle: 'Vibration on taps and actions',
+                    value: appState.hapticFeedbackEnabled,
+                    onChanged: (val) => appState.setHapticFeedbackEnabled(val),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              _buildGlassSection(
+                context,
                 'SECURITY & PRIVACY',
                 [
                   _buildGlassTile(

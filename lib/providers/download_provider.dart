@@ -22,6 +22,14 @@ import '../models/directory_item.dart';
 class DownloadProvider with ChangeNotifier {
   static const MethodChannel _channel =
       MethodChannel('com.example.dirBrowser/downloads');
+  static const MethodChannel _iosChannel =
+      MethodChannel('com.dirxplore/ios_download');
+  static const EventChannel _iosEvents =
+      EventChannel('com.dirxplore/ios_download_events');
+  StreamSubscription? _iosEventSub;
+
+  final bool _isIOS = Platform.isIOS;
+
   final List<DownloadItem> _queue = [];
   final Map<String, CancelToken> _cancelTokens = {};
   int _maxConcurrent = 3;
@@ -57,6 +65,112 @@ class DownloadProvider with ChangeNotifier {
     await _loadQueue();
     await updateStorageInfo();
     _channel.setMethodCallHandler(_handleNotificationAction);
+
+    if (_isIOS) {
+      _iosEventSub = _iosEvents.receiveBroadcastStream().listen(_handleiOSEvent);
+      _iosChannel.invokeMethod('getSavePath').then((path) {
+        if (path is String) {
+          debugPrint('iOS save path: $path');
+        }
+      }).catchError((_) {});
+    }
+  }
+
+  void _handleiOSEvent(dynamic event) {
+    if (event is! Map) return;
+    final type = event['type'] as String?;
+    final downloadId = event['downloadId'] as String?;
+    if (downloadId == null) return;
+
+    final item = _queue.firstWhere(
+      (i) => i.id == downloadId,
+      orElse: () => DownloadItem(id: '', url: '', fileName: '', savePath: ''),
+    );
+    if (item.id.isEmpty) return;
+
+    switch (type) {
+      case 'started':
+        item.status = DownloadStatus.downloading;
+        notifyListeners();
+        break;
+      case 'restored':
+        _activeCount++;
+        item.status = DownloadStatus.downloading;
+        notifyListeners();
+        break;
+      case 'progress':
+        final received = event['received'] as int? ?? 0;
+        final total = event['total'] as int? ?? 0;
+        final dt = DateTime.now();
+        if (item.downloadedBytes > 0) {
+          final diff = received - item.downloadedBytes;
+          final timeDiff = dt.difference(_lastNotifyTime).inMilliseconds;
+          if (timeDiff > 0) {
+            item.speedBytesPerSec = (item.speedBytesPerSec * 0.7) + ((diff / (timeDiff / 1000)) * 0.3);
+          }
+        }
+        item.downloadedBytes = received;
+        item.totalBytes = total;
+        if (item.speedBytesPerSec > 0 && total > 0) {
+          item.etaSeconds = ((total - received) / item.speedBytesPerSec).round();
+        }
+        if (dt.difference(_lastNotifyTime).inMilliseconds > 250) {
+          _lastNotifyTime = dt;
+          notifyListeners();
+        }
+        DatabaseHelper().updateDownload(item);
+        break;
+      case 'completed':
+        item.status = DownloadStatus.done;
+        item.speedBytesPerSec = 0;
+        item.etaSeconds = 0;
+        item.downloadedBytes = item.totalBytes;
+        if (_activeCount > 0) _activeCount--;
+        final savePath = event['savePath'] as String?;
+        if (savePath != null) {
+          item.savePath = savePath;
+        }
+        DatabaseHelper().updateDownload(item);
+        updateStorageInfo();
+        notifyListeners();
+        _processQueue();
+        break;
+      case 'paused':
+        item.status = DownloadStatus.paused;
+        item.speedBytesPerSec = 0;
+        if (_activeCount > 0) _activeCount--;
+        DatabaseHelper().updateDownload(item);
+        notifyListeners();
+        _processQueue();
+        break;
+      case 'cancelled':
+        _queue.removeWhere((i) => i.id == downloadId);
+        DatabaseHelper().deleteDownload(downloadId);
+        if (_activeCount > 0) _activeCount--;
+        if (_activeCount == 0) _stopForegroundIfNoActive();
+        notifyListeners();
+        _processQueue();
+        break;
+      case 'error':
+        item.status = DownloadStatus.error;
+        item.errorMessage = event['message'] as String? ?? 'Download failed';
+        if (_activeCount > 0) _activeCount--;
+        DatabaseHelper().updateDownload(item);
+        notifyListeners();
+        _processQueue();
+        break;
+      case 'resumed':
+        _activeCount++;
+        item.status = DownloadStatus.downloading;
+        notifyListeners();
+        break;
+    }
+  }
+
+  @override
+  void dispose() {
+    _iosEventSub?.cancel();
+    super.dispose();
   }
 
   Future<void> _handleNotificationAction(MethodCall call) async {
@@ -209,6 +323,14 @@ class DownloadProvider with ChangeNotifier {
     if (!_queue.any((i) => i.id == id)) return;
     final item = _queue.firstWhere((i) => i.id == id);
 
+    if (_isIOS && item.status == DownloadStatus.downloading) {
+      _iosChannel.invokeMethod('pauseDownload', {'downloadId': id}).catchError((_) {});
+      item.status = DownloadStatus.paused;
+      item.speedBytesPerSec = 0;
+      notifyListeners();
+      return;
+    }
+
     if (item.status == DownloadStatus.downloading) {
       _cancelTokens[id]?.cancel('Paused by user');
       _cancelTokens.remove(id);
@@ -246,10 +368,11 @@ class DownloadProvider with ChangeNotifier {
     if (!_queue.any((i) => i.id == id)) return;
     final item = _queue.firstWhere((i) => i.id == id);
 
-    if (item.status == DownloadStatus.downloading) {
+    if (_isIOS && item.status == DownloadStatus.downloading) {
+      _iosChannel.invokeMethod('cancelDownload', {'downloadId': id}).catchError((_) {});
+    } else if (item.status == DownloadStatus.downloading) {
       _cancelTokens[id]?.cancel('Stopped by user');
       _cancelTokens.remove(id);
-      // Let the finally block handle _activeCount-- gracefully
     }
 
     _queue.removeWhere((i) => i.id == id);
@@ -283,8 +406,12 @@ class DownloadProvider with ChangeNotifier {
     for (var i in _queue) {
       if (i.batchId == batchId) {
         if (i.status == DownloadStatus.downloading) {
-          _cancelTokens[i.id]?.cancel('Paused by user');
-          _cancelTokens.remove(i.id);
+          if (_isIOS) {
+            _iosChannel.invokeMethod('pauseDownload', {'downloadId': i.id}).catchError((_) {});
+          } else {
+            _cancelTokens[i.id]?.cancel('Paused by user');
+            _cancelTokens.remove(i.id);
+          }
           i.status = DownloadStatus.paused;
           i.speedBytesPerSec = 0;
           hasPaused = true;
@@ -305,8 +432,12 @@ class DownloadProvider with ChangeNotifier {
     final batchItems = _queue.where((i) => i.batchId == batchId).toList();
     for (var i in batchItems) {
       if (i.status == DownloadStatus.downloading) {
-        _cancelTokens[i.id]?.cancel('Stopped by user');
-        _cancelTokens.remove(i.id);
+        if (_isIOS) {
+          _iosChannel.invokeMethod('cancelDownload', {'downloadId': i.id}).catchError((_) {});
+        } else {
+          _cancelTokens[i.id]?.cancel('Stopped by user');
+          _cancelTokens.remove(i.id);
+        }
       }
       DatabaseHelper().deleteDownload(i.id);
     }
@@ -325,6 +456,9 @@ class DownloadProvider with ChangeNotifier {
   }
 
   void clearAll() {
+    if (_isIOS) {
+      _iosChannel.invokeMethod('cancelAll').catchError((_) {});
+    }
     for (final token in _cancelTokens.values) {
       token.cancel('Cleared');
     }
@@ -376,8 +510,12 @@ class DownloadProvider with ChangeNotifier {
 
   void deleteSelected({bool deleteFiles = false}) {
     for (String id in _selectedIds) {
-      _cancelTokens[id]?.cancel('Deleted by user');
-      _cancelTokens.remove(id);
+      if (_isIOS) {
+        _iosChannel.invokeMethod('cancelDownload', {'downloadId': id}).catchError((_) {});
+      } else {
+        _cancelTokens[id]?.cancel('Deleted by user');
+        _cancelTokens.remove(id);
+      }
 
       if (deleteFiles) {
         final itemIndex = _queue.indexWhere((i) => i.id == id);
@@ -410,8 +548,12 @@ class DownloadProvider with ChangeNotifier {
   void pauseAll() {
     // 1. Cancel all active transfers
     for (final id in _cancelTokens.keys.toList()) {
-      _cancelTokens[id]?.cancel('Paused by user');
-      _cancelTokens.remove(id);
+      if (_isIOS) {
+        _iosChannel.invokeMethod('pauseDownload', {'downloadId': id}).catchError((_) {});
+      } else {
+        _cancelTokens[id]?.cancel('Paused by user');
+        _cancelTokens.remove(id);
+      }
     }
 
     // 2. Set all queued items to paused
@@ -495,7 +637,17 @@ class DownloadProvider with ChangeNotifier {
     notifyListeners();
     await DatabaseHelper().updateDownload(item);
 
-    // Start Foreground Service
+    // iOS uses native URLSession background downloads
+    if (_isIOS) {
+      _iosChannel.invokeMethod('startDownload', {
+        'url': item.url,
+        'fileName': item.fileName,
+        'downloadId': item.id,
+      }).catchError((_) {});
+      return;
+    }
+
+    // Start Foreground Service (Android only)
     _channel.invokeMethod('startForegroundService', {
       'url': item.url,
       'filename': item.fileName,

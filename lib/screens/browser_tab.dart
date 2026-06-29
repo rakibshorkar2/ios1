@@ -8,6 +8,7 @@ import '../providers/download_provider.dart';
 import '../providers/app_state.dart';
 import '../models/directory_item.dart';
 import '../services/proxy_tunnel.dart';
+import '../services/haptic_service.dart';
 import 'package:android_intent_plus/android_intent.dart';
 import 'package:android_intent_plus/flag.dart';
 import 'media_player_screen.dart';
@@ -54,12 +55,12 @@ class _BrowserTabState extends State<BrowserTab> {
                       visualDensity: VisualDensity.compact,
                       icon: const Icon(Icons.arrow_back, size: 20),
                       onPressed:
-                          browserState.canGoBack ? browserState.goBack : null,
+                          browserState.canGoBack ? () { HapticService.light(); browserState.goBack(); } : null,
                     ),
                     IconButton(
                       visualDensity: VisualDensity.compact,
                       icon: const Icon(Icons.arrow_upward, size: 20),
-                      onPressed: browserState.goUp,
+                      onPressed: () { HapticService.light(); browserState.goUp(); },
                     ),
                     Expanded(
                       flex: 3,
@@ -98,7 +99,7 @@ class _BrowserTabState extends State<BrowserTab> {
                     IconButton(
                       visualDensity: VisualDensity.compact,
                       icon: const Icon(Icons.search, size: 20),
-                      onPressed: () => browserState.loadUrl(_urlCtrl.text),
+                      onPressed: () { HapticService.light(); browserState.loadUrl(_urlCtrl.text); },
                     ),
                   ],
                 ),
@@ -124,7 +125,7 @@ class _BrowserTabState extends State<BrowserTab> {
                               return DropdownMenuItem(value: c, child: Text(c));
                             }).toList(),
                             onChanged: (val) {
-                              if (val != null) browserState.setCategory(val);
+                              if (val != null) { HapticService.selection(); browserState.setCategory(val); }
                             },
                           ),
                         ),
@@ -147,6 +148,7 @@ class _BrowserTabState extends State<BrowserTab> {
                 ? 'Switch to Native Mode'
                 : 'Switch to WebView Mode',
             onPressed: () {
+              HapticService.medium();
               browserState.toggleFallbackMode();
             },
           ),
@@ -156,7 +158,7 @@ class _BrowserTabState extends State<BrowserTab> {
                 : Icons.star_border),
             color: browserState.isCurrentBookmarked ? Colors.amber : null,
             tooltip: 'Bookmark Page',
-            onPressed: browserState.toggleBookmark,
+            onPressed: () { HapticService.light(); browserState.toggleBookmark(); },
           ),
           IconButton(
             icon: const Icon(Icons.bookmarks),
@@ -168,12 +170,12 @@ class _BrowserTabState extends State<BrowserTab> {
               icon:
                   Icon(browserState.isGridView ? Icons.list : Icons.grid_view),
               tooltip: 'Toggle View',
-              onPressed: browserState.toggleViewMode,
+              onPressed: () { HapticService.light(); browserState.toggleViewMode(); },
             ),
             IconButton(
               icon: const Icon(Icons.sort),
               tooltip: 'Toggle Sort Options',
-              onPressed: browserState.toggleSort,
+              onPressed: () { HapticService.light(); browserState.toggleSort(); },
             ),
           ],
         ],
@@ -200,6 +202,7 @@ class _BrowserTabState extends State<BrowserTab> {
                       itemBuilder: (context, index) {
                         return InkWell(
                           onTap: () {
+                            HapticService.light();
                             browserState.loadBreadcrumb(index);
                             _urlCtrl.text = browserState.currentUrl;
                           },
@@ -240,6 +243,7 @@ class _BrowserTabState extends State<BrowserTab> {
                                     final item = browserState.items[index];
                                     return InkWell(
                                       onTap: () {
+                                        HapticService.light();
                                         if (item.isDirectory) {
                                           _urlCtrl.text = item.url;
                                           browserState.loadUrl(item.url);
@@ -247,8 +251,10 @@ class _BrowserTabState extends State<BrowserTab> {
                                           _showItemOptions(context, item);
                                         }
                                       },
-                                      onLongPress: () =>
-                                          browserState.toggleSelection(item),
+                                      onLongPress: () {
+                                        HapticService.medium();
+                                        browserState.toggleSelection(item);
+                                      },
                                       child: Card(
                                         color: item.isSelected
                                             ? Theme.of(context)
@@ -486,13 +492,16 @@ class _BrowserTabState extends State<BrowserTab> {
                                             width: 24,
                                             child: Checkbox(
                                               value: item.isSelected,
-                                              onChanged: (val) => browserState
-                                                  .toggleSelection(item),
+                                              onChanged: (val) {
+                                                HapticService.selection();
+                                                browserState.toggleSelection(item);
+                                              },
                                             ),
                                           ),
                                         ],
                                       ),
                                       onTap: () {
+                                        HapticService.light();
                                         if (item.isDirectory) {
                                           _urlCtrl.text = item.url;
                                           browserState.loadUrl(item.url);
@@ -511,6 +520,7 @@ class _BrowserTabState extends State<BrowserTab> {
               padding: const EdgeInsets.only(bottom: 90.0),
               child: FloatingActionButton.extended(
                 onPressed: () async {
+                  HapticService.medium();
                   bool hasPermission = false;
                   if (await Permission.manageExternalStorage.isGranted ||
                       await Permission.storage.isGranted) {
@@ -729,6 +739,7 @@ class _BrowserTabState extends State<BrowserTab> {
                       const Icon(Icons.play_circle_fill, color: Colors.blue),
                   title: const Text('Play in App'),
                   onTap: () {
+                    HapticService.medium();
                     Navigator.pop(ctx);
                     final browserState = context.read<BrowserProvider>();
                     final videoFiles = browserState.items.where((i) => !i.isDirectory && _isPlayableMedia(i.name)).toList();
@@ -827,6 +838,7 @@ class _BrowserTabState extends State<BrowserTab> {
                     const Icon(Icons.download_done, color: Colors.greenAccent),
                 title: const Text('Queue in App'),
                 onTap: () {
+                  HapticService.medium();
                   Navigator.pop(ctx);
                   context.read<BrowserProvider>().toggleSelection(item);
                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(

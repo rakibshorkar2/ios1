@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../providers/download_provider.dart';
 import '../models/download_item.dart';
 import '../services/thumbnail_service.dart';
+import '../services/haptic_service.dart';
 
 class DownloadTab extends StatefulWidget {
   const DownloadTab({super.key});
@@ -64,22 +65,22 @@ class _DownloadTabState extends State<DownloadTab> {
                 IconButton(
                   icon: const Icon(Icons.checklist),
                   tooltip: 'Select Items',
-                  onPressed: dlProvider.toggleSelectionMode,
+                  onPressed: () { HapticService.light(); dlProvider.toggleSelectionMode(); },
                 ),
                 IconButton(
                   icon: const Icon(Icons.pause_circle_outline),
                   tooltip: 'Pause All',
-                  onPressed: dlProvider.pauseAll,
+                  onPressed: () { HapticService.medium(); dlProvider.pauseAll(); },
                 ),
                 IconButton(
                   icon: const Icon(Icons.play_circle_outline),
                   tooltip: 'Resume All',
-                  onPressed: dlProvider.resumeAll,
+                  onPressed: () { HapticService.medium(); dlProvider.resumeAll(); },
                 ),
                 IconButton(
                   icon: const Icon(Icons.clear_all),
                   tooltip: 'Clear Done',
-                  onPressed: () => _confirmClearDone(context, dlProvider),
+                  onPressed: () { HapticService.light(); _confirmClearDone(context, dlProvider); },
                 ),
                 PopupMenuButton<String>(
                   onSelected: (value) async {
@@ -258,6 +259,7 @@ class _DownloadTabState extends State<DownloadTab> {
           children: [
             ListTile(
               onTap: () {
+                HapticService.light();
                 setState(() {
                   if (isExpanded) {
                     _expandedBatchIds.remove(batchId);
@@ -331,6 +333,7 @@ class _DownloadTabState extends State<DownloadTab> {
               leading: const Icon(Icons.play_circle),
               title: const Text('Resume All in Batch'),
               onTap: () {
+                HapticService.medium();
                 dlProvider.resumeBatch(batchId);
                 Navigator.pop(context);
               },
@@ -339,6 +342,7 @@ class _DownloadTabState extends State<DownloadTab> {
               leading: const Icon(Icons.pause_circle),
               title: const Text('Pause All in Batch'),
               onTap: () {
+                HapticService.medium();
                 dlProvider.pauseBatch(batchId);
                 Navigator.pop(context);
               },
@@ -348,7 +352,8 @@ class _DownloadTabState extends State<DownloadTab> {
               title: const Text('Remove Batch',
                   style: TextStyle(color: Colors.red)),
               onTap: () {
-                Navigator.pop(context); // close bottom sheet
+                HapticService.heavy();
+                Navigator.pop(context);
                 _confirmRemoveBatch(context, dlProvider, batchId);
               },
             ),
@@ -490,8 +495,10 @@ class _DownloadTabState extends State<DownloadTab> {
                             minimumSize: Size.zero,
                             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                           ),
-                          onPressed: () =>
-                              _showVerifyHashDialog(context, dlProvider, item),
+                          onPressed: () {
+                              HapticService.light();
+                              _showVerifyHashDialog(context, dlProvider, item);
+                            },
                         ),
                       _buildActionButtons(context, dlProvider, item),
                     ],
@@ -526,6 +533,7 @@ class _DownloadTabState extends State<DownloadTab> {
     return RepaintBoundary(
       child: GestureDetector(
         onLongPress: () {
+          HapticService.medium();
           dlProvider.toggleSelection(item.id);
         },
         child: card,
@@ -570,17 +578,17 @@ class _DownloadTabState extends State<DownloadTab> {
             item.status == DownloadStatus.queued)
           IconButton(
             icon: const Icon(Icons.pause, color: Colors.orange, size: 18),
-            onPressed: () => dlProvider.pause(item.id),
+            onPressed: () { HapticService.light(); dlProvider.pause(item.id); },
           ),
         if (item.status == DownloadStatus.paused ||
             item.status == DownloadStatus.error)
           IconButton(
             icon: const Icon(Icons.play_arrow, color: Colors.green, size: 20),
-            onPressed: () => dlProvider.resume(item.id),
+            onPressed: () { HapticService.light(); dlProvider.resume(item.id); },
           ),
         IconButton(
           icon: const Icon(Icons.close, color: Colors.red, size: 18),
-          onPressed: () => _confirmSafeDelete(context, dlProvider, item),
+          onPressed: () { HapticService.heavy(); _confirmSafeDelete(context, dlProvider, item); },
         ),
       ],
     );

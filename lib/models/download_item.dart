@@ -4,7 +4,7 @@ class DownloadItem {
   final String id;
   final String url;
   final String fileName;
-  final String savePath;
+  String savePath;
   String? batchId;
   String? batchName;
   DownloadStatus status;

@@ -26,16 +26,43 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+		<key>NSAllowsArbitraryLoadsForMedia</key>
+		<true/>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
 	<key>NSFaceIDUsageDescription</key>
 	<string>DirXplore uses Face ID / Touch ID to lock the app and protect your privacy.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>DirXplore saves downloaded files to your photo library (optional).</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>DirXplore needs photo library access to save media files.</string>
+	<key>NSDocumentsFolderUsageDescription</key>
+	<string>DirXplore needs access to documents to manage downloaded files.</string>
+	<key>NSDesktopFolderUsageDescription</key>
+	<string>DirXplore needs access to save and manage downloaded files.</string>
+	<key>NSDownloadsFolderUsageDescription</key>
+	<string>DirXplore saves downloaded files to the Downloads folder.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>DirXplore needs local network access to browse directories on your network.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_http._tcp</string>
+		<string>_ftp._tcp</string>
+	</array>
+	<key>UIFileSharingEnabled</key>
+	<true/>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>fetch</string>
 		<string>processing</string>
+		<string>download</string>
 	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
@@ -76,6 +103,10 @@
 		<string>UIInterfaceOrientationPortraitUpsideDown</string>
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UIRequiredDeviceCapabilities</key>
+	<array>
+		<string>arm64</string>
 	</array>
 </dict>
 </plist>

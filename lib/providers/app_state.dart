@@ -31,6 +31,7 @@ class AppState with ChangeNotifier {
   double _torrentUploadLimit = 0;
   bool _monitorClipboardMagnet = false;
   List<TorrentSearchProvider> _selectedTorrentProviders = TorrentSearchProvider.values;
+  bool _hapticFeedbackEnabled = true;
 
   ThemeMode get themeMode => _themeMode;
   String get defaultSavePath => _defaultSavePath;
@@ -60,6 +61,7 @@ class AppState with ChangeNotifier {
   bool get monitorClipboardMagnet => _monitorClipboardMagnet;
   List<TorrentSearchProvider> get selectedTorrentProviders =>
       _selectedTorrentProviders;
+  bool get hapticFeedbackEnabled => _hapticFeedbackEnabled;
 
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
@@ -94,6 +96,8 @@ class AppState with ChangeNotifier {
     _torrentDownloadLimit = prefs.getDouble('torrentDownloadLimit') ?? 0;
     _torrentUploadLimit = prefs.getDouble('torrentUploadLimit') ?? 0;
     _monitorClipboardMagnet = prefs.getBool('monitorClipboardMagnet') ?? false;
+    _hapticFeedbackEnabled = prefs.getBool('hapticFeedbackEnabled') ?? true;
+
     final pList = prefs.getStringList('selectedTorrentProviders');
     if (pList != null) {
       _selectedTorrentProviders = pList
@@ -271,6 +275,13 @@ class AppState with ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('monitorClipboardMagnet', val);
+  }
+
+  Future<void> setHapticFeedbackEnabled(bool val) async {
+    _hapticFeedbackEnabled = val;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('hapticFeedbackEnabled', val);
   }
 
   Future<void> setSelectedTorrentProviders(

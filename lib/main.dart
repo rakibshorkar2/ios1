@@ -3,14 +3,15 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_displaymode/flutter_displaymode.dart';
 import 'package:dynamic_color/dynamic_color.dart';
-import 'dart:ui'; // Added for ImageFilter
-import 'dart:async'; // Added for Timer
+import 'dart:ui';
+import 'dart:async';
+import 'dart:io' show Platform;
 import 'package:local_auth/local_auth.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:workmanager/workmanager.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'screens/pin_lock_screen.dart'; // New import
+import 'screens/pin_lock_screen.dart';
 
 import 'providers/app_state.dart';
 import 'providers/proxy_provider.dart';
@@ -18,6 +19,7 @@ import 'providers/download_provider.dart';
 import 'providers/browser_provider.dart';
 import 'providers/torrent_provider.dart';
 import 'services/proxy_tunnel.dart';
+import 'services/haptic_service.dart';
 import 'models/download_item.dart';
 
 import 'screens/browser_tab.dart';
@@ -125,16 +127,31 @@ class _OpenDirAppWrapperState extends State<OpenDirAppWrapper> {
   @override
   void initState() {
     super.initState();
-    // Initially check wakelock
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _updateWakelock();
       _requestNotificationPermission();
+      _initHaptics();
     });
   }
 
+  void _initHaptics() {
+    final state = Provider.of<AppState>(context, listen: false);
+    HapticService.setEnabled(state.hapticFeedbackEnabled);
+  }
+
   Future<void> _requestNotificationPermission() async {
+    if (Platform.isIOS) {
+      await _requestIOSNotificationPermission();
+    }
     final status = await Permission.notification.status;
     if (status.isDenied) {
+      await Permission.notification.request();
+    }
+  }
+
+  Future<void> _requestIOSNotificationPermission() async {
+    final status = await Permission.notification.status;
+    if (status.isDenied || status.isRestricted) {
       await Permission.notification.request();
     }
   }
@@ -146,9 +163,9 @@ class _OpenDirAppWrapperState extends State<OpenDirAppWrapper> {
 
   @override
   Widget build(BuildContext context) {
-    // Listen to changes to toggle wakelock live
     final state = context.watch<AppState>();
     WakelockPlus.toggle(enable: state.keepScreenAwake);
+    HapticService.setEnabled(state.hapticFeedbackEnabled);
 
     return const OpenDirApp();
   }
@@ -339,7 +356,10 @@ class _MainLayoutState extends State<MainLayout> {
         : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6);
 
     return InkWell(
-      onTap: () => setState(() => _currentIndex = index),
+      onTap: () {
+        HapticService.light();
+        setState(() => _currentIndex = index);
+      },
       customBorder: const CircleBorder(),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
