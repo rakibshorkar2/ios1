@@ -129,18 +129,10 @@ class _OpenDirAppWrapperState extends State<OpenDirAppWrapper> {
   }
 
   Future<void> _requestNotificationPermission() async {
-    if (Platform.isIOS) {
-      await _requestIOSNotificationPermission();
-    }
     final status = await Permission.notification.status;
-    if (status.isDenied) {
+    if (Platform.isIOS && status.isRestricted) {
       await Permission.notification.request();
-    }
-  }
-
-  Future<void> _requestIOSNotificationPermission() async {
-    final status = await Permission.notification.status;
-    if (status.isDenied || status.isRestricted) {
+    } else if (status.isDenied) {
       await Permission.notification.request();
     }
   }

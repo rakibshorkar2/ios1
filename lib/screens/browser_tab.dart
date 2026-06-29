@@ -528,16 +528,17 @@ class _BrowserTabState extends State<BrowserTab> {
               child: FloatingActionButton.extended(
                 onPressed: () async {
                   HapticService.medium();
-                  bool hasPermission = false;
-                  if (await Permission.manageExternalStorage.isGranted ||
-                      await Permission.storage.isGranted) {
-                    hasPermission = true;
-                  } else {
-                    final statusManage =
-                        await Permission.manageExternalStorage.request();
-                    final statusStorage = await Permission.storage.request();
-                    if (statusManage.isGranted || statusStorage.isGranted) {
-                      hasPermission = true;
+                  bool hasPermission = Platform.isIOS; // iOS sandbox is always accessible
+                  if (!Platform.isIOS) {
+                    hasPermission = await Permission.manageExternalStorage.isGranted ||
+                        await Permission.storage.isGranted;
+                    if (!hasPermission) {
+                      final statusManage =
+                          await Permission.manageExternalStorage.request();
+                      final statusStorage = await Permission.storage.request();
+                      if (statusManage.isGranted || statusStorage.isGranted) {
+                        hasPermission = true;
+                      }
                     }
                   }
 
@@ -785,9 +786,10 @@ class _BrowserTabState extends State<BrowserTab> {
                   }
                 } else if (Platform.isIOS) {
                   try {
-                    // Use native channel to bypass Uri.parse mangling of vlc:// scheme
+                    // Present share sheet with the original URL so user can open in VLC
+                    // VLC on iOS can't reach the local proxy tunnel, so use original URL
                     const iosChannel = MethodChannel('com.dirxplore/ios_download');
-                    await iosChannel.invokeMethod('openURL', {'url': 'vlc://$tunnelUrl'});
+                    await iosChannel.invokeMethod('openURL', {'url': item.url});
                   } catch (_) {
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(

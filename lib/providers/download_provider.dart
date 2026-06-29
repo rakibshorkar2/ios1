@@ -645,23 +645,14 @@ class DownloadProvider with ChangeNotifier {
     notifyListeners();
     await DatabaseHelper().updateDownload(item);
 
-    // iOS uses native URLSession background downloads
-    if (_isIOS) {
-      _iosChannel.invokeMethod('startDownload', {
-        'url': item.url,
-        'fileName': item.fileName,
-        'downloadId': item.id,
-        'saveDir': (File(item.savePath).parent).path,
-      }).catchError((e) { debugPrint('Channel method error: $e'); });
-      return;
-    }
-
     // Start Foreground Service (Android only)
-    _channel.invokeMethod('startForegroundService', {
-      'url': item.url,
-      'filename': item.fileName,
-      'id': 1001,
-    }).catchError((e) { debugPrint('Channel method error: $e'); });
+    if (!_isIOS) {
+      _channel.invokeMethod('startForegroundService', {
+        'url': item.url,
+        'filename': item.fileName,
+        'id': 1001,
+      }).catchError((e) { debugPrint('Channel method error: $e'); });
+    }
 
     final cancelToken = CancelToken();
     _cancelTokens[item.id] = cancelToken;

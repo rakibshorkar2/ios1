@@ -80,7 +80,12 @@ import UIKit
                 if let args = call.arguments as? [String: Any],
                    let urlStr = args["url"] as? String,
                    let url = URL(string: urlStr) {
-                    UIApplication.shared.open(url)
+                    DispatchQueue.main.async {
+                        if let rootVC = UIApplication.shared.keyWindow?.rootViewController {
+                            let activityVC = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+                            rootVC.present(activityVC, animated: true)
+                        }
+                    }
                 }
                 result(nil)
 
