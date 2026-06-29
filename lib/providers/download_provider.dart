@@ -74,7 +74,7 @@ class DownloadProvider with ChangeNotifier {
         if (path is String) {
           debugPrint('iOS save path: $path');
         }
-      }).catchError((_) {});
+      }).catchError((e) { debugPrint('Channel method error: $e'); });
     }
   }
 
@@ -332,7 +332,7 @@ class DownloadProvider with ChangeNotifier {
     final item = _queue.firstWhere((i) => i.id == id);
 
     if (_isIOS && item.status == DownloadStatus.downloading) {
-      _iosChannel.invokeMethod('pauseDownload', {'downloadId': id}).catchError((_) {});
+      _iosChannel.invokeMethod('pauseDownload', {'downloadId': id}).catchError((e) { debugPrint('Channel method error: $e'); });
       item.status = DownloadStatus.paused;
       item.speedBytesPerSec = 0;
       notifyListeners();
@@ -359,7 +359,7 @@ class DownloadProvider with ChangeNotifier {
     if (_activeCount <= 1) {
       // 1 because we are about to decrement
       _channel.invokeMethod(
-          'stopForegroundService', {'id': 1001}).catchError((_) {});
+          'stopForegroundService', {'id': 1001}).catchError((e) { debugPrint('Channel method error: $e'); });
     }
   }
 
@@ -377,7 +377,7 @@ class DownloadProvider with ChangeNotifier {
     final item = _queue.firstWhere((i) => i.id == id);
 
     if (_isIOS && item.status == DownloadStatus.downloading) {
-      _iosChannel.invokeMethod('cancelDownload', {'downloadId': id}).catchError((_) {});
+      _iosChannel.invokeMethod('cancelDownload', {'downloadId': id}).catchError((e) { debugPrint('Channel method error: $e'); });
     } else if (item.status == DownloadStatus.downloading) {
       _cancelTokens[id]?.cancel('Stopped by user');
       _cancelTokens.remove(id);
@@ -415,7 +415,7 @@ class DownloadProvider with ChangeNotifier {
       if (i.batchId == batchId) {
         if (i.status == DownloadStatus.downloading) {
           if (_isIOS) {
-            _iosChannel.invokeMethod('pauseDownload', {'downloadId': i.id}).catchError((_) {});
+            _iosChannel.invokeMethod('pauseDownload', {'downloadId': i.id}).catchError((e) { debugPrint('Channel method error: $e'); });
           } else {
             _cancelTokens[i.id]?.cancel('Paused by user');
             _cancelTokens.remove(i.id);
@@ -441,7 +441,7 @@ class DownloadProvider with ChangeNotifier {
     for (var i in batchItems) {
       if (i.status == DownloadStatus.downloading) {
         if (_isIOS) {
-          _iosChannel.invokeMethod('cancelDownload', {'downloadId': i.id}).catchError((_) {});
+          _iosChannel.invokeMethod('cancelDownload', {'downloadId': i.id}).catchError((e) { debugPrint('Channel method error: $e'); });
         } else {
           _cancelTokens[i.id]?.cancel('Stopped by user');
           _cancelTokens.remove(i.id);
@@ -519,7 +519,7 @@ class DownloadProvider with ChangeNotifier {
   void deleteSelected({bool deleteFiles = false}) {
     for (String id in _selectedIds) {
       if (_isIOS) {
-        _iosChannel.invokeMethod('cancelDownload', {'downloadId': id}).catchError((_) {});
+        _iosChannel.invokeMethod('cancelDownload', {'downloadId': id}).catchError((e) { debugPrint('Channel method error: $e'); });
       } else {
         _cancelTokens[id]?.cancel('Deleted by user');
         _cancelTokens.remove(id);
@@ -557,7 +557,7 @@ class DownloadProvider with ChangeNotifier {
     // 1. Cancel all active transfers
     for (final id in _cancelTokens.keys.toList()) {
       if (_isIOS) {
-        _iosChannel.invokeMethod('pauseDownload', {'downloadId': id}).catchError((_) {});
+        _iosChannel.invokeMethod('pauseDownload', {'downloadId': id}).catchError((e) { debugPrint('Channel method error: $e'); });
       } else {
         _cancelTokens[id]?.cancel('Paused by user');
         _cancelTokens.remove(id);
@@ -651,7 +651,8 @@ class DownloadProvider with ChangeNotifier {
         'url': item.url,
         'fileName': item.fileName,
         'downloadId': item.id,
-      }).catchError((_) {});
+        'saveDir': (File(item.savePath).parent).path,
+      }).catchError((e) { debugPrint('Channel method error: $e'); });
       return;
     }
 
@@ -660,7 +661,7 @@ class DownloadProvider with ChangeNotifier {
       'url': item.url,
       'filename': item.fileName,
       'id': 1001,
-    }).catchError((_) {});
+    }).catchError((e) { debugPrint('Channel method error: $e'); });
 
     final cancelToken = CancelToken();
     _cancelTokens[item.id] = cancelToken;
@@ -707,7 +708,7 @@ class DownloadProvider with ChangeNotifier {
           'id': 1001,
           'filename': item.fileName,
           'success': true,
-        }).catchError((_) {});
+        }).catchError((e) { debugPrint('Channel method error: $e'); });
 
         // Finalize state
         if (_activeCount > 0) {
@@ -744,7 +745,7 @@ class DownloadProvider with ChangeNotifier {
         'id': 1001,
         'filename': item.fileName,
         'success': true,
-      }).catchError((_) {});
+      }).catchError((e) { debugPrint('Channel method error: $e'); });
     } catch (e) {
       _handleDownloadError(item, e);
     } finally {
@@ -835,7 +836,7 @@ class DownloadProvider with ChangeNotifier {
       'eta': _formatDuration(item.etaSeconds),
       'size':
           '${_formatSize(item.downloadedBytes)} / ${_formatSize(item.totalBytes)}',
-    }).catchError((_) {});
+    }).catchError((e) { debugPrint('Channel method error: $e'); });
 
     final now = DateTime.now();
     if (now.difference(_lastNotifyTime).inMilliseconds > 250) {
@@ -984,6 +985,13 @@ class DownloadProvider with ChangeNotifier {
     } catch (e) {
       debugPrint('Import error: $e');
       return false;
+    }
+  }
+
+  void revealFile(String path) {
+    if (_isIOS) {
+      _iosChannel.invokeMethod('openFileLocation', {'path': path})
+          .catchError((e) { debugPrint('revealFile error: $e'); });
     }
   }
 }

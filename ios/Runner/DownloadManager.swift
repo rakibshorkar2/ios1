@@ -11,10 +11,29 @@ class DownloadManager: NSObject {
     private var taskIdMap: [Int: String] = [:]
     private var progressMap: [String: (received: Int64, total: Int64)] = [:]
     private var resumeDataMap: [String: Data] = [:]
+    private var saveDirMap: [String: String] = [:]
+    private var retryCountMap: [String: Int] = [:]
+    private var downloadUrlMap: [String: String] = [:]
+    private let maxRetries = 3
     private var liveActivities: [String: Activity<DownloadActivityAttributes>] = [:]
     var liveActivityEnabled: Bool = true
 
-    var eventSink: FlutterEventSink?
+    var eventSink: FlutterEventSink? {
+        didSet {
+            if eventSink != nil {
+                replayPendingEvents()
+            }
+        }
+    }
+    private var pendingEvents: [[String: Any]] = []
+
+    private func replayPendingEvents() {
+        guard let sink = eventSink else { return }
+        for event in pendingEvents {
+            sink(event)
+        }
+        pendingEvents.removeAll()
+    }
 
     private override init() {
         super.init()
@@ -30,7 +49,11 @@ class DownloadManager: NSObject {
         backgroundSession = URLSession(configuration: config, delegate: self, delegateQueue: nil)
     }
 
-    func startDownload(url: String, fileName: String, downloadId: String) {
+    func startDownload(url: String, fileName: String, downloadId: String, saveDir: String? = nil) {
+        if let dir = saveDir {
+            saveDirMap[downloadId] = dir
+        }
+        downloadUrlMap[downloadId] = url
         guard let downloadUrl = URL(string: url) else {
             sendEvent(type: "error", downloadId: downloadId, data: ["message": "Invalid URL"])
             return
@@ -86,6 +109,7 @@ class DownloadManager: NSObject {
         taskIdMap.removeValue(forKey: task.taskIdentifier)
         resumeDataMap.removeValue(forKey: downloadId)
         progressMap.removeValue(forKey: downloadId)
+        retryCountMap.removeValue(forKey: downloadId)
         endLiveActivity(downloadId: downloadId, status: "Cancelled")
         sendEvent(type: "cancelled", downloadId: downloadId, data: [:])
     }
@@ -96,6 +120,7 @@ class DownloadManager: NSObject {
             taskIdMap.removeValue(forKey: task.taskIdentifier)
             resumeDataMap.removeValue(forKey: id)
             progressMap.removeValue(forKey: id)
+            retryCountMap.removeValue(forKey: id)
             endLiveActivity(downloadId: id, status: "Cancelled")
         }
         activeTasks.removeAll()
@@ -121,9 +146,12 @@ class DownloadManager: NSObject {
     }
 
     private func sendEvent(type: String, downloadId: String, data: [String: Any]) {
-        guard let sink = eventSink else { return }
         var event: [String: Any] = ["type": type, "downloadId": downloadId]
         event.merge(data) { (_, new) in new }
+        guard let sink = eventSink else {
+            pendingEvents.append(event)
+            return
+        }
         sink(event)
     }
 
@@ -239,8 +267,13 @@ extension DownloadManager: URLSessionDownloadDelegate {
         guard parts.count == 2 else { return }
         let fileName = String(parts[1])
 
-        let documentsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-        let destinationDir = documentsDir.appendingPathComponent("DirXplore", isDirectory: true)
+        let destinationDir: URL
+        if let customDir = saveDirMap[downloadId], let customUrl = URL(string: "file://\(customDir)") {
+            destinationDir = customUrl
+        } else {
+            let documentsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+            destinationDir = documentsDir.appendingPathComponent("DirXplore", isDirectory: true)
+        }
         try? FileManager.default.createDirectory(at: destinationDir, withIntermediateDirectories: true)
         let destinationUrl = destinationDir.appendingPathComponent(fileName)
 
@@ -260,6 +293,7 @@ extension DownloadManager: URLSessionDownloadDelegate {
         activeTasks.removeValue(forKey: downloadId)
         taskIdMap.removeValue(forKey: downloadTask.taskIdentifier)
         progressMap.removeValue(forKey: downloadId)
+        retryCountMap.removeValue(forKey: downloadId)
     }
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
@@ -281,8 +315,35 @@ extension DownloadManager: URLSessionDownloadDelegate {
                     endLiveActivity(downloadId: downloadId, status: "Failed")
                 }
             } else {
-                sendEvent(type: "error", downloadId: downloadId, data: ["message": error.localizedDescription])
-                endLiveActivity(downloadId: downloadId, status: "Failed")
+                let attempt = retryCountMap[downloadId] ?? 0
+                if attempt < maxRetries, let downloadUrl = downloadUrlMap[downloadId] {
+                    retryCountMap[downloadId] = attempt + 1
+                    let parts = downloadId.split(separator: "|")
+                    let fileName = parts.last ?? "file"
+                    let delay = Double(1 << attempt)
+                    debugPrint("Retrying download \(downloadId) in \(delay)s (attempt \(attempt + 1)/\(maxRetries))")
+                    DispatchQueue.global().asyncAfter(deadline: .now() + delay) { [weak self] in
+                        guard let self = self, self.retryCountMap[downloadId] != nil else { return }
+                        let resumeData = (error as NSError?)?.userInfo[NSURLSessionDownloadTaskResumeData] as? Data
+                        let newTask: URLSessionDownloadTask
+                        if let data = resumeData {
+                            newTask = self.backgroundSession.downloadTask(withResumeData: data)
+                        } else {
+                            var request = URLRequest(url: URL(string: downloadUrl)!)
+                            request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1", forHTTPHeaderField: "User-Agent")
+                            newTask = self.backgroundSession.downloadTask(with: request)
+                        }
+                        newTask.taskDescription = task.taskDescription ?? "\(downloadId)|\(fileName)"
+                        self.activeTasks[downloadId] = newTask
+                        self.taskIdMap[newTask.taskIdentifier] = downloadId
+                        newTask.resume()
+                        self.sendEvent(type: "resumed", downloadId: downloadId, data: ["fileName": fileName])
+                    }
+                } else {
+                    sendEvent(type: "error", downloadId: downloadId, data: ["message": error.localizedDescription])
+                    endLiveActivity(downloadId: downloadId, status: "Failed")
+                    retryCountMap.removeValue(forKey: downloadId)
+                }
             }
         }
     }

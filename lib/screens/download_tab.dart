@@ -615,20 +615,41 @@ class _DownloadTabState extends State<DownloadTab> {
       mainAxisSize: MainAxisSize.min,
       children: [
         if (item.status == DownloadStatus.done)
-          IconButton(
-            icon: Icon(Icons.share, color: cs.primary, size: 20),
-            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-            onPressed: () {
-              HapticService.light();
-              final file = File(item.savePath);
-              if (file.existsSync()) {
-                Share.shareXFiles([XFile(item.savePath)], text: item.fileName);
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('File not found on disk.')),
-                );
-              }
-            },
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                icon: Icon(Icons.share, color: cs.primary, size: 20),
+                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                onPressed: () {
+                  HapticService.light();
+                  final file = File(item.savePath);
+                  if (file.existsSync()) {
+                    Share.shareXFiles([XFile(item.savePath)], text: item.fileName);
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('File not found on disk.')),
+                    );
+                  }
+                },
+              ),
+              if (Platform.isIOS)
+                IconButton(
+                  icon: Icon(Icons.folder_open, color: cs.secondary, size: 20),
+                  constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                  onPressed: () {
+                    HapticService.light();
+                    final file = File(item.savePath);
+                    if (file.existsSync()) {
+                      dlProvider.revealFile(item.savePath);
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('File not found on disk.')),
+                      );
+                    }
+                  },
+                ),
+            ],
           ),
         if (item.status == DownloadStatus.downloading ||
             item.status == DownloadStatus.queued)

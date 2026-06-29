@@ -28,7 +28,8 @@ import UIKit
                    let url = args["url"] as? String,
                    let fileName = args["fileName"] as? String,
                    let downloadId = args["downloadId"] as? String {
-                    DownloadManager.shared.startDownload(url: url, fileName: fileName, downloadId: downloadId)
+                    let saveDir = args["saveDir"] as? String
+                    DownloadManager.shared.startDownload(url: url, fileName: fileName, downloadId: downloadId, saveDir: saveDir)
                     result(true)
                 } else {
                     result(FlutterError(code: "INVALID_ARGS", message: "Missing parameters", details: nil))
@@ -61,6 +62,19 @@ import UIKit
                 let dirXploreDir = documentsDir.appendingPathComponent("DirXplore", isDirectory: true)
                 try? FileManager.default.createDirectory(at: dirXploreDir, withIntermediateDirectories: true)
                 result(dirXploreDir.path)
+
+            case "openFileLocation":
+                if let args = call.arguments as? [String: Any],
+                   let path = args["path"] as? String {
+                    let fileURL = URL(fileURLWithPath: path)
+                    if let rootVC = UIApplication.shared.keyWindow?.rootViewController {
+                        let activityVC = UIActivityViewController(activityItems: [fileURL], applicationActivities: nil)
+                        rootVC.present(activityVC, animated: true)
+                    }
+                    result(true)
+                } else {
+                    result(FlutterError(code: "INVALID_ARGS", message: "Missing path", details: nil))
+                }
 
             default:
                 result(FlutterMethodNotImplemented)
