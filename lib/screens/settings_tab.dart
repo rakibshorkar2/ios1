@@ -1,11 +1,8 @@
-import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'dart:ui';
 import '../providers/app_state.dart';
-import '../services/github_updater.dart';
 import 'security_setup_screen.dart';
 
 class SettingsTab extends StatelessWidget {
@@ -317,12 +314,6 @@ class SettingsTab extends StatelessWidget {
                     title: const Text('Version'),
                     subtitle: Text(appState.appVersion),
                   ),
-                  _buildGlassTile(
-                    title: const Text('Check for Updates'),
-                    subtitle: const Text('Check GitHub for new releases'),
-                    leading: const Icon(Icons.system_update),
-                    onTap: () => _checkForUpdates(context),
-                  ),
                 ],
               ),
               const SizedBox(height: 32),
@@ -446,55 +437,6 @@ class SettingsTab extends StatelessWidget {
       value: value,
       onChanged: onChanged,
     );
-  }
-
-  void _checkForUpdates(BuildContext context) async {
-    showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (ctx) => const AlertDialog(
-                content: Row(children: [
-              CircularProgressIndicator(),
-              SizedBox(width: 20),
-              Text('Checking GitHub...'),
-            ])));
-
-    final updateInfo = await GithubUpdater.checkUpdate();
-    if (context.mounted) {
-      Navigator.pop(context);
-    }
-
-    if (updateInfo != null) {
-      if (context.mounted) {
-        showDialog(
-            context: context,
-            builder: (ctx) => AlertDialog(
-                  title: Text('Update Available: ${updateInfo.version}'),
-                  content: SingleChildScrollView(
-                    child: Text(updateInfo.releaseNotes ?? 'No release notes.'),
-                  ),
-                  actions: [
-                    TextButton(
-                        onPressed: () => Navigator.pop(ctx),
-                        child: const Text('Later')),
-                    ElevatedButton(
-                      onPressed: () {
-                        launchUrl(Uri.parse(updateInfo.downloadUrl),
-                            mode: LaunchMode.externalApplication);
-                        Navigator.pop(ctx);
-                      },
-                      child: Text(Platform.isAndroid ? 'Download APK' : 'Download from GitHub'),
-                    )
-                  ],
-                ));
-      }
-    } else {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('You are on the latest version!')),
-        );
-      }
-    }
   }
 
   void _showSecuritySetup(BuildContext context) {

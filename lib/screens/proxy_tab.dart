@@ -334,7 +334,6 @@ class ProxyTab extends StatelessWidget {
               String port = item['port']?.toString() ?? '1080';
               String user = item['username']?.toString() ?? '';
               String pass = item['password']?.toString() ?? '';
-
               if (ip.isEmpty) continue;
 
               String uriStr = '$type://';

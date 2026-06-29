@@ -303,6 +303,7 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
 
   Widget _categoryChip(TorrentCategory cat) {
     final isSelected = _selectedCategory == cat;
+    final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.only(right: 8.0),
       child: AnimatedContainer(
@@ -311,9 +312,9 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
           label: Text(
             cat.name.toUpperCase(),
             style: TextStyle(
-              fontSize: 10,
-              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-              color: isSelected ? Theme.of(context).colorScheme.onPrimary : null,
+              fontSize: 11,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+              color: isSelected ? cs.onPrimary : cs.onSurface.withValues(alpha: 0.7),
             ),
           ),
           selected: isSelected,
@@ -327,12 +328,12 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
               }
             }
           },
-          padding: const EdgeInsets.symmetric(horizontal: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
           visualDensity: VisualDensity.compact,
-          selectedColor: Theme.of(context).colorScheme.primary,
-          backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          selectedColor: cs.primary,
+          backgroundColor: cs.surfaceContainer,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           side: BorderSide.none,
           showCheckmark: false,
         ),
@@ -342,6 +343,7 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
 
   Widget _sortChip(String label, String key) {
     final isSelected = _sortBy == key;
+    final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.only(right: 8.0),
       child: AnimatedContainer(
@@ -350,9 +352,9 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
           label: Text(
             label.toUpperCase(),
             style: TextStyle(
-              fontSize: 10,
-              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-              color: isSelected ? Theme.of(context).colorScheme.onPrimary : null,
+              fontSize: 11,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+              color: isSelected ? cs.onPrimary : cs.onSurface.withValues(alpha: 0.7),
             ),
           ),
           selected: isSelected,
@@ -364,12 +366,12 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
               });
             }
           },
-          padding: const EdgeInsets.symmetric(horizontal: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
           visualDensity: VisualDensity.compact,
-          selectedColor: Theme.of(context).colorScheme.primary,
-          backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          selectedColor: cs.primary,
+          backgroundColor: cs.surfaceContainer,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           side: BorderSide.none,
           showCheckmark: false,
         ),
@@ -580,27 +582,21 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
     if (_searchResults.isEmpty && !_isLoadingSearch) {
       return _buildEmptyState('No torrents found. Try searching for something!', Icons.search_off);
     }
+    final cs = Theme.of(context).colorScheme;
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       itemCount: _searchResults.length,
       itemBuilder: (context, index) {
         final res = _searchResults[index];
         return Container(
-          margin: const EdgeInsets.only(bottom: 12),
+          margin: const EdgeInsets.only(bottom: 14),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surfaceContainerLow.withValues(alpha: 0.5),
-            borderRadius: BorderRadius.circular(16),
+            color: cs.surfaceContainerLow.withValues(alpha: 0.6),
+            borderRadius: BorderRadius.circular(18),
             border: Border.all(
-              color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.2),
+              color: cs.outlineVariant.withValues(alpha: 0.25),
             ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -611,10 +607,11 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
                   Expanded(
                     child: Text(
                       res.title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.w600,
                         fontSize: 14,
-                        letterSpacing: -0.2,
+                        letterSpacing: -0.3,
+                        color: cs.onSurface,
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
@@ -622,30 +619,30 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
                   ),
                   const SizedBox(width: 8),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.4),
-                      borderRadius: BorderRadius.circular(6),
+                      color: cs.primaryContainer.withValues(alpha: 0.5),
+                      borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
                       res.provider.toUpperCase(),
                       style: TextStyle(
                         fontSize: 9,
-                        color: Theme.of(context).colorScheme.primary,
+                        color: cs.primary,
                         fontWeight: FontWeight.bold,
-                        letterSpacing: 0.5,
+                        letterSpacing: 0.8,
                       ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
               Row(
                 children: [
-                  _infoBadge(Icons.storage_outlined, res.size, Colors.grey),
-                  const SizedBox(width: 16),
+                  _infoBadge(Icons.storage_outlined, res.size, cs.onSurface.withValues(alpha: 0.6)),
+                  const SizedBox(width: 20),
                   _infoBadge(Icons.arrow_upward, res.seeds, Colors.green),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 20),
                   _infoBadge(Icons.arrow_downward, res.peers, Colors.orange),
                 ],
               ),
@@ -657,14 +654,15 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
                     _actionButtonCompact(
                       label: 'Magnet',
                       icon: Icons.copy_rounded,
-                      color: Colors.blue,
+                      color: cs.primary,
                       onPressed: () async {
                         await Clipboard.setData(ClipboardData(text: res.magnet));
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Magnet link copied to clipboard'),
+                            SnackBar(
+                              content: const Text('Magnet link copied to clipboard'),
                               behavior: SnackBarBehavior.floating,
+                              backgroundColor: cs.inverseSurface,
                             ),
                           );
                         }
@@ -695,7 +693,7 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
                     _actionButtonCompact(
                       label: 'Add',
                       icon: Icons.add_rounded,
-                      color: Colors.grey,
+                      color: cs.onSurface.withValues(alpha: 0.6),
                       onPressed: () => _handleNewTorrent(context, res.title, res.magnet, res.size),
                     ),
                   ],
@@ -1031,28 +1029,22 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
     final isDownloading = t.status == TorrentStatus.downloading;
     final isPaused = t.status == TorrentStatus.paused;
     final isCompleted = t.status == TorrentStatus.completed;
+    final cs = Theme.of(context).colorScheme;
 
-    Color statusColor = Colors.blue;
+    Color statusColor = cs.primary;
     if (isCompleted) statusColor = Colors.green;
     if (isPaused) statusColor = Colors.orange;
-    if (t.status == TorrentStatus.error) statusColor = Colors.red;
+    if (t.status == TorrentStatus.error) statusColor = cs.error;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerLow.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(16),
+        color: cs.surfaceContainerLow.withValues(alpha: 0.6),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.2),
+          color: cs.outlineVariant.withValues(alpha: 0.25),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1060,9 +1052,9 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha: 0.1),
+                  color: statusColor.withValues(alpha: 0.12),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
@@ -1071,14 +1063,14 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
                   size: 20,
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       t.name,
-                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: cs.onSurface),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -1087,7 +1079,7 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
                       '${t.size} • ${t.status.name.toUpperCase()}',
                       style: TextStyle(
                         fontSize: 11,
-                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                        color: cs.onSurface.withValues(alpha: 0.6),
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -1095,7 +1087,8 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
                 ),
               ),
               PopupMenuButton(
-                icon: const Icon(Icons.more_vert_rounded, size: 20),
+                icon: Icon(Icons.more_vert_rounded, size: 20, color: cs.onSurface.withValues(alpha: 0.7)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 itemBuilder: (ctx) => [
                   if (isPaused)
                     const PopupMenuItem(value: 'resume', child: Text('Resume'))
@@ -1151,13 +1144,10 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
           ),
           const SizedBox(height: 16),
           ClipRRect(
-            borderRadius: BorderRadius.circular(4),
+            borderRadius: BorderRadius.circular(6),
             child: LinearProgressIndicator(
               value: t.progress,
-              backgroundColor: Theme.of(context)
-                  .colorScheme
-                  .outlineVariant
-                  .withValues(alpha: 0.2),
+              backgroundColor: cs.outlineVariant.withValues(alpha: 0.2),
               color: statusColor,
               minHeight: 8,
             ),

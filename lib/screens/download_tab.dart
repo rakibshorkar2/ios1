@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
+import '../providers/app_state.dart';
 import '../providers/download_provider.dart';
 import '../models/download_item.dart';
 import '../services/thumbnail_service.dart';
@@ -164,8 +165,12 @@ class _DownloadTabState extends State<DownloadTab> {
 
   Widget _buildStorageAnalyzer() {
     final dlProvider = context.watch<DownloadProvider>();
+    final appState = context.watch<AppState>();
     final totalMB = dlProvider.totalStorage;
     final freeMB = dlProvider.freeStorage;
+    final cs = Theme.of(context).colorScheme;
+    final isAmoled = appState.trueAmoledDark &&
+        Theme.of(context).brightness == Brightness.dark;
 
     if (totalMB <= 0) return const SizedBox.shrink();
 
@@ -173,36 +178,37 @@ class _DownloadTabState extends State<DownloadTab> {
     final progress = totalMB > 0 ? (usedMB / totalMB) : 0.0;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: Theme.of(context)
-          .colorScheme
-          .surfaceContainerHighest
-          .withValues(alpha: 0.3),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      color: isAmoled
+          ? Colors.black
+          : cs.surfaceContainerHighest.withValues(alpha: 0.4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Device Storage',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              Text('Device Storage',
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                      color: cs.onSurface)),
               Text(
                 'Free: ${(freeMB / 1024).toStringAsFixed(1)} GB / ${(totalMB / 1024).toStringAsFixed(1)} GB',
-                style: const TextStyle(fontSize: 12),
+                style: TextStyle(fontSize: 12, color: cs.onSurface.withValues(alpha: 0.7)),
               ),
             ],
           ),
-          const SizedBox(height: 5),
+          const SizedBox(height: 6),
           ClipRRect(
-            borderRadius: BorderRadius.circular(4),
+            borderRadius: BorderRadius.circular(6),
             child: LinearProgressIndicator(
               value: progress,
               minHeight: 6,
               color: progress > 0.9
                   ? Colors.red
-                  : Theme.of(context).colorScheme.primary,
-              backgroundColor:
-                  Theme.of(context).colorScheme.surfaceContainerHighest,
+                  : cs.primary,
+              backgroundColor: cs.surfaceContainerHighest,
             ),
           ),
         ],
@@ -241,6 +247,7 @@ class _DownloadTabState extends State<DownloadTab> {
     final batchName = items.first.batchName ?? 'Folder Download';
     final String batchId = items.first.batchId!;
     final bool isExpanded = _expandedBatchIds.contains(batchId);
+    final cs = Theme.of(context).colorScheme;
 
     final int totalItems = items.length;
     final int doneItems =
@@ -250,16 +257,12 @@ class _DownloadTabState extends State<DownloadTab> {
 
     return RepaintBoundary(
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: Theme.of(context)
-              .colorScheme
-              .primaryContainer
-              .withValues(alpha: 0.15),
+          color: cs.primaryContainer.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-              color:
-                  Theme.of(context).colorScheme.primary.withValues(alpha: 0.1)),
+              color: cs.primary.withValues(alpha: 0.15)),
         ),
         child: Column(
           children: [
@@ -274,24 +277,27 @@ class _DownloadTabState extends State<DownloadTab> {
                   }
                 });
               },
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
               leading: CircleAvatar(
-                backgroundColor: Theme.of(context).colorScheme.primary,
-                child: const Icon(Icons.folder, color: Colors.white, size: 20),
+                backgroundColor: cs.primaryContainer,
+                child: Icon(Icons.folder, color: cs.onPrimaryContainer, size: 20),
               ),
               title: Text('${index != null ? "$index. " : ""}$batchName',
-                  style: const TextStyle(fontWeight: FontWeight.bold)),
+                  style: TextStyle(fontWeight: FontWeight.bold, color: cs.onSurface)),
               subtitle: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                       '$doneItems / $totalItems files complete (${(avgProgress * 100).toInt()}%)',
-                      style: const TextStyle(fontSize: 12)),
-                  const SizedBox(height: 4),
+                      style: TextStyle(fontSize: 12, color: cs.onSurface.withValues(alpha: 0.7))),
+                  const SizedBox(height: 6),
                   ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
+                    borderRadius: BorderRadius.circular(6),
                     child: LinearProgressIndicator(
                       value: avgProgress,
-                      minHeight: 4,
+                      minHeight: 6,
+                      color: cs.primary,
+                      backgroundColor: cs.surfaceContainerHighest,
                     ),
                   ),
                 ],
@@ -300,17 +306,18 @@ class _DownloadTabState extends State<DownloadTab> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.more_vert),
+                    icon: Icon(Icons.more_vert, color: cs.onSurface.withValues(alpha: 0.7)),
                     onPressed: () =>
                         _showBatchOptions(context, dlProvider, batchId, items),
                   ),
-                  Icon(isExpanded ? Icons.expand_less : Icons.expand_more),
+                  Icon(isExpanded ? Icons.expand_less : Icons.expand_more,
+                      color: cs.onSurface.withValues(alpha: 0.6)),
                 ],
               ),
             ),
             if (isExpanded)
               Padding(
-                padding: const EdgeInsets.only(bottom: 8.0),
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
                 child: Column(
                   children: items
                       .asMap()
@@ -418,25 +425,26 @@ class _DownloadTabState extends State<DownloadTab> {
       {bool isNested = false, int? index}) {
     final bool isSelected = dlProvider.selectedIds.contains(item.id);
     final bool isSelectionMode = dlProvider.isSelectionMode;
+    final cs = Theme.of(context).colorScheme;
 
     Widget card = Container(
       margin: isNested
           ? EdgeInsets.zero
-          : const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          : const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.6),
+        color: cs.surface.withValues(alpha: 0.8),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.1),
+          color: cs.outlineVariant.withValues(alpha: 0.3),
         ),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(12.0),
+        padding: EdgeInsets.all(isNested ? 10 : 14),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildThumbnail(item),
-            const SizedBox(width: 12),
+            SizedBox(width: isNested ? 10 : 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -445,30 +453,31 @@ class _DownloadTabState extends State<DownloadTab> {
                     '${index != null ? "$index. " : ""}${item.fileName}',
                     style: TextStyle(
                         fontWeight:
-                            isNested ? FontWeight.normal : FontWeight.bold,
-                        fontSize: isNested ? 13 : 14),
+                            isNested ? FontWeight.w600 : FontWeight.bold,
+                        fontSize: isNested ? 13 : 15),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 6),
+                  SizedBox(height: isNested ? 4 : 8),
                   ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
+                    borderRadius: BorderRadius.circular(6),
                     child: LinearProgressIndicator(
                       value: item.progress,
-                      minHeight: 6,
-                      backgroundColor:
-                          Theme.of(context).colorScheme.surfaceContainerHighest,
+                      minHeight: 7,
+                      backgroundColor: cs.surfaceContainerHighest,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: isNested ? 6 : 10),
                   Row(
                     children: [
                       Expanded(
                         flex: 3,
                         child: Text(
                           '${_formatBytes(item.downloadedBytes)} / ${_formatBytes(item.totalBytes)} (${(item.progress * 100).toInt()}%)',
-                          style: const TextStyle(
-                              fontSize: 10, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                              fontSize: isNested ? 10 : 11,
+                              fontWeight: FontWeight.bold,
+                              color: cs.onSurface.withValues(alpha: 0.8)),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
@@ -478,7 +487,10 @@ class _DownloadTabState extends State<DownloadTab> {
                         child: Text(
                           _formatSpeedAndETA(item),
                           textAlign: TextAlign.center,
-                          style: const TextStyle(fontSize: 10),
+                          style: TextStyle(
+                            fontSize: isNested ? 10 : 11,
+                            color: cs.onSurface.withValues(alpha: 0.7),
+                          ),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
@@ -489,12 +501,12 @@ class _DownloadTabState extends State<DownloadTab> {
                           item.statusLabel,
                           textAlign: TextAlign.end,
                           style: TextStyle(
-                            fontSize: 10,
+                            fontSize: isNested ? 10 : 11,
                             color: item.status == DownloadStatus.error
-                                ? Colors.red
+                                ? cs.error
                                 : (item.status == DownloadStatus.done
                                     ? Colors.green
-                                    : Colors.blue),
+                                    : cs.primary),
                             fontWeight: FontWeight.bold,
                           ),
                           overflow: TextOverflow.ellipsis,
@@ -502,19 +514,21 @@ class _DownloadTabState extends State<DownloadTab> {
                       ),
                     ],
                   ),
-                  if (item.errorMessage != null)
+                  if (item.errorMessage != null) ...[
+                    const SizedBox(height: 4),
                     Text(item.errorMessage!,
-                        style:
-                            const TextStyle(color: Colors.red, fontSize: 10)),
+                        style: TextStyle(color: cs.error, fontSize: 11)),
+                  ],
                   const SizedBox(height: 4),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
                       if (item.status == DownloadStatus.done)
                         TextButton.icon(
-                          icon: const Icon(Icons.verified_user, size: 14),
-                          label: const Text('Verify',
-                              style: TextStyle(fontSize: 11)),
+                          icon: Icon(Icons.verified_user, size: 14,
+                              color: cs.primary),
+                          label: Text('Verify',
+                              style: TextStyle(fontSize: 11, color: cs.primary)),
                           style: TextButton.styleFrom(
                             padding: const EdgeInsets.symmetric(horizontal: 8),
                             minimumSize: Size.zero,
@@ -596,12 +610,14 @@ class _DownloadTabState extends State<DownloadTab> {
 
   Widget _buildActionButtons(
       BuildContext context, DownloadProvider dlProvider, DownloadItem item) {
+    final cs = Theme.of(context).colorScheme;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         if (item.status == DownloadStatus.done)
           IconButton(
-            icon: const Icon(Icons.share, color: CupertinoColors.activeBlue, size: 18),
+            icon: Icon(Icons.share, color: cs.primary, size: 20),
+            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
             onPressed: () {
               HapticService.light();
               final file = File(item.savePath);
@@ -617,17 +633,20 @@ class _DownloadTabState extends State<DownloadTab> {
         if (item.status == DownloadStatus.downloading ||
             item.status == DownloadStatus.queued)
           IconButton(
-            icon: const Icon(Icons.pause, color: Colors.orange, size: 18),
+            icon: const Icon(Icons.pause_circle_outline, color: Colors.orange, size: 22),
+            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
             onPressed: () { HapticService.light(); dlProvider.pause(item.id); },
           ),
         if (item.status == DownloadStatus.paused ||
             item.status == DownloadStatus.error)
           IconButton(
-            icon: const Icon(Icons.play_arrow, color: Colors.green, size: 20),
+            icon: const Icon(Icons.play_circle_outline, color: Colors.green, size: 22),
+            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
             onPressed: () { HapticService.light(); dlProvider.resume(item.id); },
           ),
         IconButton(
-          icon: const Icon(Icons.close, color: Colors.red, size: 18),
+          icon: Icon(Icons.close_rounded, color: cs.error, size: 20),
+          constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
           onPressed: () { HapticService.heavy(); _confirmSafeDelete(context, dlProvider, item); },
         ),
       ],

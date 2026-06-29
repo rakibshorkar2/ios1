@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
+import 'package:yaml/yaml.dart';
 import '../models/proxy_model.dart';
 import '../services/dio_client.dart';
 
@@ -40,12 +42,38 @@ class AppProxyProvider with ChangeNotifier {
     final maps = await _db!.query('proxies');
 
     if (maps.isEmpty) {
-      final defaultProxy =
-          ProxyModel.fromUri('socks5://test:test@103.166.253.92:1088');
-      if (defaultProxy != null) {
-        defaultProxy.isActive = false;
-        await _db!.insert('proxies', defaultProxy.toMap());
-        return _loadProxies();
+      try {
+        final yamlString = await rootBundle.loadString('bypassempire.yaml');
+        final yamlDoc = loadYaml(yamlString);
+        if (yamlDoc is YamlMap) {
+          final proxiesList = yamlDoc['proxies'];
+          if (proxiesList is YamlList) {
+            int count = 0;
+            for (var item in proxiesList) {
+              if (item is! YamlMap) continue;
+              final type = item['type']?.toString() ?? 'socks5';
+              final server = item['server']?.toString() ?? '';
+              final port = item['port']?.toString() ?? '1080';
+              final user = item['username']?.toString() ?? '';
+              final pass = item['password']?.toString() ?? '';
+              if (server.isEmpty) continue;
+              String uriStr = '$type://';
+              if (user.isNotEmpty) uriStr += '$user:$pass@';
+              uriStr += '$server:$port';
+              final model = ProxyModel.fromUri(uriStr);
+              if (model != null) {
+                model.isActive = false;
+                await _db!.insert('proxies', model.toMap(),
+                    conflictAlgorithm: ConflictAlgorithm.ignore);
+                count++;
+              }
+            }
+            debugPrint('Imported $count proxies from bypassempire.yaml');
+            if (count > 0) return _loadProxies();
+          }
+        }
+      } catch (e) {
+        debugPrint('Failed to load bypassempire.yaml: $e');
       }
     }
 
