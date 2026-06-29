@@ -26,6 +26,8 @@ class DownloadProvider with ChangeNotifier {
       MethodChannel('com.dirxplore/ios_download');
   static const EventChannel _iosEvents =
       EventChannel('com.dirxplore/ios_download_events');
+  static const MethodChannel _liveActivityChannel =
+      MethodChannel('com.dirxplore/live_activity');
   StreamSubscription? _iosEventSub;
 
   final bool _isIOS = Platform.isIOS;
@@ -882,6 +884,39 @@ class DownloadProvider with ChangeNotifier {
       return calculatedHash.toLowerCase() == expectedHash;
     } catch (e) {
       debugPrint('Hash verification error: $e');
+      return false;
+    }
+  }
+
+  // --- Live Activities (iOS 16.1+) ---
+  Future<bool> isLiveActivitySupported() async {
+    if (!_isIOS) return false;
+    try {
+      return await _liveActivityChannel.invokeMethod('isSupported') ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> enableLiveActivity() async {
+    if (!_isIOS) return;
+    try {
+      await _liveActivityChannel.invokeMethod('enable');
+    } catch (_) {}
+  }
+
+  Future<void> disableLiveActivity() async {
+    if (!_isIOS) return;
+    try {
+      await _liveActivityChannel.invokeMethod('disable');
+    } catch (_) {}
+  }
+
+  Future<bool> isLiveActivityEnabled() async {
+    if (!_isIOS) return false;
+    try {
+      return await _liveActivityChannel.invokeMethod('isEnabled') ?? true;
+    } catch (_) {
       return false;
     }
   }

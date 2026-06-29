@@ -73,6 +73,38 @@ import UIKit
         )
         eventChannel.setStreamHandler(DownloadManager.shared)
 
+        let liveActivityChannel = FlutterMethodChannel(
+            name: "com.dirxplore/live_activity",
+            binaryMessenger: controller.binaryMessenger
+        )
+
+        liveActivityChannel.setMethodCallHandler { [weak self] (call, result) in
+            guard self != nil else { return }
+            switch call.method {
+            case "isSupported":
+                if #available(iOS 16.1, *) {
+                    result(true)
+                } else {
+                    result(false)
+                }
+
+            case "enable":
+                DownloadManager.shared.liveActivityEnabled = true
+                result(true)
+
+            case "disable":
+                DownloadManager.shared.liveActivityEnabled = false
+                DownloadManager.shared.endAllLiveActivities()
+                result(true)
+
+            case "isEnabled":
+                result(DownloadManager.shared.liveActivityEnabled)
+
+            default:
+                result(FlutterMethodNotImplemented)
+            }
+        }
+
         return super.application(application, didFinishLaunchingWithOptions: launchOptions)
     }
 

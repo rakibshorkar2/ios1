@@ -1,6 +1,7 @@
 import Flutter
 import UIKit
 import Foundation
+import ActivityKit
 
 class DownloadManager: NSObject {
     static let shared = DownloadManager()
@@ -10,6 +11,8 @@ class DownloadManager: NSObject {
     private var taskIdMap: [Int: String] = [:]
     private var progressMap: [String: (received: Int64, total: Int64)] = [:]
     private var resumeDataMap: [String: Data] = [:]
+    private var liveActivities: [String: Activity<DownloadActivityAttributes>] = [:]
+    var liveActivityEnabled: Bool = true
 
     var eventSink: FlutterEventSink?
 
@@ -40,6 +43,7 @@ class DownloadManager: NSObject {
             taskIdMap[task.taskIdentifier] = downloadId
             resumeDataMap.removeValue(forKey: downloadId)
             task.resume()
+            startLiveActivity(downloadId: downloadId, fileName: fileName)
             sendEvent(type: "resumed", downloadId: downloadId, data: ["fileName": fileName])
         } else {
             var request = URLRequest(url: downloadUrl)
@@ -51,6 +55,7 @@ class DownloadManager: NSObject {
             taskIdMap[task.taskIdentifier] = downloadId
             progressMap[downloadId] = (0, 0)
             task.resume()
+            startLiveActivity(downloadId: downloadId, fileName: fileName)
             sendEvent(type: "started", downloadId: downloadId, data: ["fileName": fileName, "url": url])
         }
     }
@@ -81,6 +86,7 @@ class DownloadManager: NSObject {
         taskIdMap.removeValue(forKey: task.taskIdentifier)
         resumeDataMap.removeValue(forKey: downloadId)
         progressMap.removeValue(forKey: downloadId)
+        endLiveActivity(downloadId: downloadId, status: "Cancelled")
         sendEvent(type: "cancelled", downloadId: downloadId, data: [:])
     }
 
@@ -90,6 +96,7 @@ class DownloadManager: NSObject {
             taskIdMap.removeValue(forKey: task.taskIdentifier)
             resumeDataMap.removeValue(forKey: id)
             progressMap.removeValue(forKey: id)
+            endLiveActivity(downloadId: id, status: "Cancelled")
         }
         activeTasks.removeAll()
     }
@@ -129,11 +136,100 @@ class DownloadManager: NSObject {
     }
 }
 
+    // MARK: - Live Activities
+
+    private func startLiveActivity(downloadId: String, fileName: String) {
+        guard #available(iOS 16.1, *), liveActivityEnabled else { return }
+        let attributes = DownloadActivityAttributes(downloadId: downloadId)
+        let state = DownloadActivityAttributes.ContentState(
+            fileName: fileName,
+            receivedBytes: 0,
+            totalBytes: 0,
+            progress: 0,
+            status: "Downloading..."
+        )
+        let content = ActivityContent(state: state, staleDate: nil)
+        do {
+            let activity = try Activity.request(
+                attributes: attributes,
+                content: content,
+                pushType: nil
+            )
+            liveActivities[downloadId] = activity
+        } catch {
+            debugPrint("Failed to start Live Activity: \(error)")
+        }
+    }
+
+    private func updateLiveActivity(downloadId: String, received: Int64, total: Int64) {
+        guard #available(iOS 16.1, *),
+              let activity = liveActivities[downloadId] else { return }
+        let state = DownloadActivityAttributes.ContentState(
+            fileName: activity.attributes.downloadId,
+            receivedBytes: received,
+            totalBytes: total,
+            progress: total > 0 ? Double(received) / Double(total) : 0,
+            status: total > 0 ? "Downloading... \(Int(Double(received) / Double(total) * 100))%" : "Downloading..."
+        )
+        Task {
+            await activity.update(using: state)
+        }
+    }
+
+    private func endLiveActivity(downloadId: String, status: String) {
+        guard #available(iOS 16.1, *),
+              let activity = liveActivities.removeValue(forKey: downloadId) else { return }
+
+        if let current = activity.content.state as? DownloadActivityAttributes.ContentState {
+            let finalState = DownloadActivityAttributes.ContentState(
+                fileName: current.fileName,
+                receivedBytes: current.receivedBytes,
+                totalBytes: current.totalBytes,
+                progress: current.progress,
+                status: status
+            )
+            Task {
+                await activity.end(using: finalState, dismissalPolicy: .after(Date.now + 4))
+            }
+        } else {
+            Task {
+                await activity.end(dismissalPolicy: .after(Date.now + 4))
+            }
+        }
+    }
+
+    private func updateLiveActivityFileName(downloadId: String, fileName: String) {
+        guard #available(iOS 16.1, *),
+              let activity = liveActivities[downloadId] else { return }
+        let current = activity.content.state as? DownloadActivityAttributes.ContentState
+        let state = DownloadActivityAttributes.ContentState(
+            fileName: fileName,
+            receivedBytes: current?.receivedBytes ?? 0,
+            totalBytes: current?.totalBytes ?? 0,
+            progress: current?.progress ?? 0,
+            status: current?.status ?? "Downloading..."
+        )
+        Task {
+            await activity.update(using: state)
+        }
+    }
+
+    private func endAllLiveActivities() {
+        guard #available(iOS 16.1, *), liveActivityEnabled else { return }
+        for (_, activity) in liveActivities {
+            Task {
+                await activity.end(dismissalPolicy: .immediate)
+            }
+        }
+        liveActivities.removeAll()
+    }
+
 extension DownloadManager: URLSessionDownloadDelegate {
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
         guard let downloadId = taskIdMap[downloadTask.taskIdentifier] else { return }
         progressMap[downloadId] = (totalBytesWritten, totalBytesExpectedToWrite)
         sendProgress(downloadId: downloadId, received: totalBytesWritten, total: totalBytesExpectedToWrite)
+        updateLiveActivity(downloadId: downloadId, received: totalBytesWritten, total: totalBytesExpectedToWrite)
     }
 
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
@@ -155,8 +251,10 @@ extension DownloadManager: URLSessionDownloadDelegate {
                 "fileName": fileName,
                 "savePath": destinationUrl.path
             ])
+            endLiveActivity(downloadId: downloadId, status: "Complete")
         } catch {
             sendEvent(type: "error", downloadId: downloadId, data: ["message": "Failed to move file: \(error.localizedDescription)"])
+            endLiveActivity(downloadId: downloadId, status: "Failed")
         }
 
         activeTasks.removeValue(forKey: downloadId)
@@ -170,17 +268,21 @@ extension DownloadManager: URLSessionDownloadDelegate {
             if error.code == NSURLErrorCancelled {
                 if resumeDataMap[downloadId] == nil {
                     sendEvent(type: "cancelled", downloadId: downloadId, data: [:])
+                    endLiveActivity(downloadId: downloadId, status: "Cancelled")
                 }
             } else if error.domain == NSURLErrorDomain && error.userInfo[NSURLSessionDownloadTaskResumeData] != nil {
                 let resumeData = error.userInfo[NSURLSessionDownloadTaskResumeData] as? Data
                 if let data = resumeData {
                     resumeDataMap[downloadId] = data
                     sendEvent(type: "paused", downloadId: downloadId, data: ["resumable": true])
+                    endLiveActivity(downloadId: downloadId, status: "Paused")
                 } else {
                     sendEvent(type: "error", downloadId: downloadId, data: ["message": error.localizedDescription])
+                    endLiveActivity(downloadId: downloadId, status: "Failed")
                 }
             } else {
                 sendEvent(type: "error", downloadId: downloadId, data: ["message": error.localizedDescription])
+                endLiveActivity(downloadId: downloadId, status: "Failed")
             }
         }
     }
