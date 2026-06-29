@@ -134,12 +134,11 @@ class DownloadManager: NSObject {
             "progress": total > 0 ? Double(received) / Double(total) : 0.0
         ])
     }
-}
 
     // MARK: - Live Activities
 
     private func startLiveActivity(downloadId: String, fileName: String) {
-        guard #available(iOS 16.1, *), liveActivityEnabled else { return }
+        guard #available(iOS 16.2, *), liveActivityEnabled else { return }
         let attributes = DownloadActivityAttributes(downloadId: downloadId)
         let state = DownloadActivityAttributes.ContentState(
             fileName: fileName,
@@ -162,7 +161,7 @@ class DownloadManager: NSObject {
     }
 
     private func updateLiveActivity(downloadId: String, received: Int64, total: Int64) {
-        guard #available(iOS 16.1, *),
+        guard #available(iOS 16.2, *),
               let activity = liveActivities[downloadId] else { return }
         let state = DownloadActivityAttributes.ContentState(
             fileName: activity.attributes.downloadId,
@@ -177,7 +176,7 @@ class DownloadManager: NSObject {
     }
 
     private func endLiveActivity(downloadId: String, status: String) {
-        guard #available(iOS 16.1, *),
+        guard #available(iOS 16.2, *),
               let activity = liveActivities.removeValue(forKey: downloadId) else { return }
 
         if let current = activity.content.state as? DownloadActivityAttributes.ContentState {
@@ -189,17 +188,17 @@ class DownloadManager: NSObject {
                 status: status
             )
             Task {
-                await activity.end(using: finalState, dismissalPolicy: .after(Date.now + 4))
+                await activity.end(using: finalState, dismissalPolicy: .after(Date.now.addingTimeInterval(4)))
             }
         } else {
             Task {
-                await activity.end(dismissalPolicy: .after(Date.now + 4))
+                await activity.end(dismissalPolicy: .after(Date.now.addingTimeInterval(4)))
             }
         }
     }
 
     private func updateLiveActivityFileName(downloadId: String, fileName: String) {
-        guard #available(iOS 16.1, *),
+        guard #available(iOS 16.2, *),
               let activity = liveActivities[downloadId] else { return }
         let current = activity.content.state as? DownloadActivityAttributes.ContentState
         let state = DownloadActivityAttributes.ContentState(
@@ -215,7 +214,7 @@ class DownloadManager: NSObject {
     }
 
     private func endAllLiveActivities() {
-        guard #available(iOS 16.1, *), liveActivityEnabled else { return }
+        guard #available(iOS 16.2, *), liveActivityEnabled else { return }
         for (_, activity) in liveActivities {
             Task {
                 await activity.end(dismissalPolicy: .immediate)
