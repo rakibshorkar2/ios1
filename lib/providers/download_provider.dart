@@ -203,6 +203,12 @@ class DownloadProvider with ChangeNotifier {
   Future<void> _loadQueue() async {
     _queue.clear();
     _queue.addAll(await DatabaseHelper().getDownloads());
+    for (final item in _queue) {
+      if (item.status == DownloadStatus.downloading) {
+        item.status = DownloadStatus.queued;
+        await DatabaseHelper().updateDownload(item);
+      }
+    }
     notifyListeners();
     _processQueue();
   }

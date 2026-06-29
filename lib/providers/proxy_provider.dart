@@ -43,15 +43,15 @@ class AppProxyProvider with ChangeNotifier {
       final defaultProxy =
           ProxyModel.fromUri('socks5://test:test@103.166.253.92:1088');
       if (defaultProxy != null) {
-        defaultProxy.isActive = true;
+        defaultProxy.isActive = false;
         await _db!.insert('proxies', defaultProxy.toMap());
-        return _loadProxies(); // Reload after insert
+        return _loadProxies();
       }
     }
 
     _proxies = maps.map((m) => ProxyModel.fromMap(m)).toList();
 
-    // Automatically apply active proxy to Dio
+    // Apply active proxy to Dio, or null if none active (direct connection)
     final active = activeProxy;
     DioClient().setProxy(active);
 
