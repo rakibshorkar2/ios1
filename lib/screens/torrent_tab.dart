@@ -23,7 +23,7 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
   final TextEditingController _searchController = TextEditingController();
   List<TorrentSearchResult> _searchResults = [];
   bool _isLoadingSearch = false;
-  String _sortBy = 'seeds'; // 'seeds', 'size', 'name'
+  String _sortBy = 'seeds';
   TorrentCategory _selectedCategory = TorrentCategory.all;
   Timer? _clipboardTimer;
   String _lastClipboard = '';
@@ -76,50 +76,149 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
   }
 
   void _showMagnetDetectedDialog(String magnet) {
-    if (magnet == _lastClipboard &&
-        (ModalRoute.of(context)?.isCurrent ?? false)) {
-      // Already handled or not on screen
-    }
-
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.blue.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.link_rounded, color: Colors.blue, size: 20),
-            ),
-            const SizedBox(width: 12),
-            const Text('Magnet Link Detected', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          ],
-        ),
-        content: const Text(
-            'A magnet link was found in your clipboard. Would you like to add it to your downloads?'),
+      builder: (ctx) => _buildGlassDialog(
+        title: 'Magnet Link Detected',
+        icon: Icons.link_rounded,
+        iconColor: Colors.blue,
+        content: 'A magnet link was found in your clipboard. Would you like to add it to your downloads?',
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text('Ignore', style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6))),
+            child: Text('Ignore',
+                style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6))),
           ),
-          ElevatedButton(
+          _buildGlassButton(
+            label: 'Add Torrent',
             onPressed: () {
               Navigator.pop(ctx);
               _handleNewTorrent(context, 'New Torrent', magnet, 'Unknown');
             },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.primary,
-              foregroundColor: Theme.of(context).colorScheme.onPrimary,
-              elevation: 0,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            child: const Text('Add Torrent'),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _glassContainer({required Widget child, EdgeInsets? padding, EdgeInsets? margin, double blur = 20}) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      margin: margin,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.white.withValues(alpha: 0.3),
+        ),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
+          child: Container(
+            padding: padding ?? const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.06)
+                  : Colors.white.withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: child,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _glassButton({required String label, required VoidCallback onPressed, Color? color}) {
+    final cs = Theme.of(context).colorScheme;
+    final btnColor = color ?? cs.primary;
+    return ElevatedButton(
+      onPressed: onPressed,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: btnColor.withValues(alpha: 0.2),
+        foregroundColor: btnColor,
+        elevation: 0,
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: BorderSide(color: btnColor.withValues(alpha: 0.3)),
+        ),
+      ),
+      child: Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
+    );
+  }
+
+  Widget _buildGlassDialog({
+    required String title,
+    required IconData icon,
+    required Color iconColor,
+    required String content,
+    required List<Widget> actions,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return AlertDialog(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      contentPadding: EdgeInsets.zero,
+      content: ClipRRect(
+        borderRadius: BorderRadius.circular(28),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: isDark
+                  ? Colors.grey.shade900.withValues(alpha: 0.85)
+                  : Colors.white.withValues(alpha: 0.85),
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.1)
+                    : Colors.white.withValues(alpha: 0.5),
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: iconColor.withValues(alpha: 0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(icon, color: iconColor, size: 22),
+                    ),
+                    const SizedBox(width: 14),
+                    Text(title,
+                        style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: -0.3)),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Text(content,
+                    style: TextStyle(
+                        fontSize: 14,
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withValues(alpha: 0.7),
+                        height: 1.4)),
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: actions,
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -128,18 +227,16 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     final appState = context.watch<AppState>();
     final tProvider = context.watch<TorrentProvider>();
+    final isAmoled = appState.trueAmoledDark && Theme.of(context).brightness == Brightness.dark;
 
     return DefaultTabController(
       length: 2,
       child: Scaffold(
+        backgroundColor: Colors.transparent,
         body: Container(
           decoration: BoxDecoration(
-            color: appState.trueAmoledDark &&
-                    Theme.of(context).brightness == Brightness.dark
-                ? Colors.black
-                : null,
-            gradient: appState.trueAmoledDark &&
-                    Theme.of(context).brightness == Brightness.dark
+            color: isAmoled ? Colors.black : null,
+            gradient: isAmoled
                 ? null
                 : LinearGradient(
                     begin: Alignment.topLeft,
@@ -157,7 +254,7 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
             headerSliverBuilder: (context, innerBoxIsScrolled) {
               return [
                 SliverAppBar(
-                  expandedHeight: 120.0,
+                  expandedHeight: 120,
                   floating: true,
                   pinned: true,
                   stretch: true,
@@ -169,37 +266,28 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
                       style: TextStyle(
                         color: Theme.of(context).colorScheme.onSurface,
                         fontWeight: FontWeight.bold,
+                        letterSpacing: -0.5,
                       ),
                     ),
                     centerTitle: false,
-                    titlePadding: const EdgeInsetsDirectional.only(
-                      start: 16,
-                      bottom: 16,
-                    ),
+                    titlePadding: const EdgeInsetsDirectional.only(start: 16, bottom: 16),
                     background: ClipRect(
                       child: BackdropFilter(
-                        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
                         child: Container(
                           color: Theme.of(context)
                               .colorScheme
                               .surface
-                              .withValues(alpha: 0.2),
+                              .withValues(alpha: 0.15),
                         ),
                       ),
                     ),
                   ),
                   actions: [
+                    _buildStatusIcon(context, Icons.vpn_lock, 'VPN Active', Colors.green),
                     _buildStatusIcon(
                       context,
-                      Icons.vpn_lock,
-                      'VPN Active',
-                      Colors.green,
-                    ),
-                    _buildStatusIcon(
-                      context,
-                      appState.torrentWifiOnly
-                          ? Icons.wifi
-                          : Icons.signal_cellular_alt,
+                      appState.torrentWifiOnly ? Icons.wifi : Icons.signal_cellular_alt,
                       appState.torrentWifiOnly ? 'Wi-Fi Only' : 'All Networks',
                       appState.torrentWifiOnly ? Colors.blue : Colors.orange,
                     ),
@@ -209,18 +297,51 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
                 SliverPersistentHeader(
                   pinned: true,
                   delegate: _SliverAppBarDelegate(
-                    TabBar(
-                      tabs: const [
-                        Tab(text: 'Search'),
-                        Tab(text: 'Active'),
-                      ],
-                      labelColor: Theme.of(context).colorScheme.primary,
-                      unselectedLabelColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                      indicatorColor: Theme.of(context).colorScheme.primary,
-                      indicatorSize: TabBarIndicatorSize.label,
-                      dividerColor: Colors.transparent,
-                      labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                      unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 16),
+                    Container(
+                      decoration: BoxDecoration(
+                        border: Border(
+                          bottom: BorderSide(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .outlineVariant
+                                .withValues(alpha: 0.15),
+                            width: 0.5,
+                          ),
+                        ),
+                      ),
+                      child: ClipRRect(
+                        child: BackdropFilter(
+                          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                          child: Container(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .surface
+                                .withValues(alpha: 0.6),
+                            child: TabBar(
+                              tabs: const [
+                                Tab(text: 'Search'),
+                                Tab(text: 'Active'),
+                              ],
+                              labelColor: Theme.of(context).colorScheme.primary,
+                              unselectedLabelColor: Theme.of(context)
+                                  .colorScheme
+                                  .onSurface
+                                  .withValues(alpha: 0.5),
+                              indicatorColor: Theme.of(context).colorScheme.primary,
+                              indicatorSize: TabBarIndicatorSize.label,
+                              dividerColor: Colors.transparent,
+                              labelStyle: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                  letterSpacing: -0.3),
+                              unselectedLabelStyle: const TextStyle(
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: 15,
+                                  letterSpacing: -0.3),
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -240,8 +361,21 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
             onPressed: () => _showAddTorrentDialog(context),
             icon: const Icon(Icons.link),
             label: const Text('Add Link'),
-            backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-            foregroundColor: Theme.of(context).colorScheme.onPrimaryContainer,
+            backgroundColor: Theme.of(context)
+                .colorScheme
+                .primary
+                .withValues(alpha: 0.25),
+            foregroundColor: Theme.of(context).colorScheme.primary,
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(18),
+              side: BorderSide(
+                color: Theme.of(context)
+                    .colorScheme
+                    .primary
+                    .withValues(alpha: 0.3),
+              ),
+            ),
           ),
         ),
       ),
@@ -252,19 +386,17 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Row(
             children: [
               Expanded(child: _buildSearchBar(context, appState)),
-              const SizedBox(width: 8),
+              const SizedBox(width: 10),
               _buildProviderSelector(context, appState),
             ],
           ),
         ),
         _buildFilterHeader(),
-        Expanded(
-          child: _buildSearchResults(),
-        ),
+        Expanded(child: _buildSearchResults()),
       ],
     );
   }
@@ -274,10 +406,10 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
       children: [
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
           child: Row(
             children: [
-              const Icon(Icons.category_outlined, size: 14, color: Colors.grey),
+              Icon(Icons.category_outlined, size: 13, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)),
               const SizedBox(width: 8),
               ...TorrentCategory.values.map((cat) => _categoryChip(cat)),
             ],
@@ -285,10 +417,10 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
         ),
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
           child: Row(
             children: [
-              const Icon(Icons.sort_outlined, size: 14, color: Colors.grey),
+              Icon(Icons.sort_outlined, size: 13, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)),
               const SizedBox(width: 8),
               _sortChip('Seeds', 'seeds'),
               _sortChip('Size', 'size'),
@@ -296,7 +428,7 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
             ],
           ),
         ),
-        const Divider(height: 1),
+        const SizedBox(height: 4),
       ],
     );
   }
@@ -305,38 +437,40 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
     final isSelected = _selectedCategory == cat;
     final cs = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.only(right: 8.0),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        child: ChoiceChip(
-          label: Text(
-            cat.name.toUpperCase(),
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-              color: isSelected ? cs.onPrimary : cs.onSurface.withValues(alpha: 0.7),
-            ),
+      padding: const EdgeInsets.only(right: 8),
+      child: ChoiceChip(
+        label: Text(
+          cat.name.toUpperCase(),
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+            color: isSelected ? cs.onPrimary : cs.onSurface.withValues(alpha: 0.6),
+            letterSpacing: 0.5,
           ),
-          selected: isSelected,
-          onSelected: (val) {
-            if (val) {
-              setState(() {
-                _selectedCategory = cat;
-              });
-              if (_searchController.text.isNotEmpty) {
-                _performSearch(_searchController.text, context.read<AppState>());
-              }
-            }
-          },
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          visualDensity: VisualDensity.compact,
-          selectedColor: cs.primary,
-          backgroundColor: cs.surfaceContainer,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          side: BorderSide.none,
-          showCheckmark: false,
         ),
+        selected: isSelected,
+        onSelected: (val) {
+          if (val) {
+            setState(() => _selectedCategory = cat);
+            if (_searchController.text.isNotEmpty) {
+              _performSearch(_searchController.text, context.read<AppState>());
+            }
+          }
+        },
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        visualDensity: VisualDensity.compact,
+        selectedColor: cs.primary,
+        backgroundColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+          side: BorderSide(
+            color: isSelected
+                ? cs.primary.withValues(alpha: 0.5)
+                : cs.outlineVariant.withValues(alpha: 0.3),
+          ),
+        ),
+        showCheckmark: false,
       ),
     );
   }
@@ -345,36 +479,40 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
     final isSelected = _sortBy == key;
     final cs = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.only(right: 8.0),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        child: ChoiceChip(
-          label: Text(
-            label.toUpperCase(),
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-              color: isSelected ? cs.onPrimary : cs.onSurface.withValues(alpha: 0.7),
-            ),
+      padding: const EdgeInsets.only(right: 8),
+      child: ChoiceChip(
+        label: Text(
+          label.toUpperCase(),
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+            color: isSelected ? cs.onPrimary : cs.onSurface.withValues(alpha: 0.6),
+            letterSpacing: 0.5,
           ),
-          selected: isSelected,
-          onSelected: (val) {
-            if (val) {
-              setState(() {
-                _sortBy = key;
-                _sortResults();
-              });
-            }
-          },
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          visualDensity: VisualDensity.compact,
-          selectedColor: cs.primary,
-          backgroundColor: cs.surfaceContainer,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          side: BorderSide.none,
-          showCheckmark: false,
         ),
+        selected: isSelected,
+        onSelected: (val) {
+          if (val) {
+            setState(() {
+              _sortBy = key;
+              _sortResults();
+            });
+          }
+        },
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        visualDensity: VisualDensity.compact,
+        selectedColor: cs.primary,
+        backgroundColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+          side: BorderSide(
+            color: isSelected
+                ? cs.primary.withValues(alpha: 0.5)
+                : cs.outlineVariant.withValues(alpha: 0.3),
+          ),
+        ),
+        showCheckmark: false,
       ),
     );
   }
@@ -383,12 +521,13 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
     if (_searchResults.isEmpty) return;
     setState(() {
       if (_sortBy == 'seeds') {
-        _searchResults.sort((a, b) => (int.tryParse(b.seeds) ?? 0)
-            .compareTo(int.tryParse(a.seeds) ?? 0));
+        _searchResults.sort((a, b) =>
+            (int.tryParse(b.seeds) ?? 0).compareTo(int.tryParse(a.seeds) ?? 0));
       } else if (_sortBy == 'size') {
-        _searchResults.sort((a, b) => b.size.compareTo(a.size)); 
+        _searchResults.sort((a, b) => b.size.compareTo(a.size));
       } else if (_sortBy == 'name') {
-        _searchResults.sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
+        _searchResults.sort((a, b) =>
+            a.title.toLowerCase().compareTo(b.title.toLowerCase()));
       }
     });
   }
@@ -396,8 +535,7 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
   Widget _buildActiveTab(TorrentProvider provider) {
     final activeList = provider.torrents
         .where((t) =>
-            t.status != TorrentStatus.completed &&
-            t.status != TorrentStatus.error)
+            t.status != TorrentStatus.completed && t.status != TorrentStatus.error)
         .toList();
 
     if (activeList.isEmpty) {
@@ -407,13 +545,13 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       itemCount: activeList.length,
-      itemBuilder: (context, index) {
-        return _buildTorrentItem(context, activeList[index], provider);
-      },
+      itemBuilder: (context, index) =>
+          _buildTorrentItem(context, activeList[index], provider),
     );
   }
 
   Widget _buildEmptyState(String msg, IconData icon) {
+    final cs = Theme.of(context).colorScheme;
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -421,19 +559,20 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
           Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+              color: cs.primary.withValues(alpha: 0.08),
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, size: 48, color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.5)),
+            child: Icon(icon, size: 48, color: cs.primary.withValues(alpha: 0.4)),
           ),
           const SizedBox(height: 24),
           Text(
             msg,
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-              fontSize: 16,
+              color: cs.onSurface.withValues(alpha: 0.5),
+              fontSize: 15,
               fontWeight: FontWeight.w500,
+              letterSpacing: -0.2,
             ),
           ),
         ],
@@ -441,8 +580,7 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildStatusIcon(
-      BuildContext context, IconData icon, String tooltip, Color color) {
+  Widget _buildStatusIcon(BuildContext context, IconData icon, String tooltip, Color color) {
     return Tooltip(
       message: tooltip,
       child: Container(
@@ -451,59 +589,53 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: color.withValues(alpha: 0.3)),
+          border: Border.all(color: color.withValues(alpha: 0.25)),
         ),
-        child: Icon(icon, color: color, size: 16),
+        child: Icon(icon, color: color, size: 15),
       ),
     );
   }
 
   Widget _buildSearchBar(BuildContext context, AppState appState) {
-    return Container(
-      height: 50,
-      decoration: BoxDecoration(
-        color: Theme.of(context)
-            .colorScheme
-            .surfaceContainer
-            .withValues(alpha: 0.4),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Theme.of(context)
-              .colorScheme
-              .outlineVariant
-              .withValues(alpha: 0.2),
-        ),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(18),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+        child: Container(
+          height: 48,
+          decoration: BoxDecoration(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.06)
+                : Colors.white.withValues(alpha: 0.5),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.1)
+                  : Colors.white.withValues(alpha: 0.4),
+            ),
+          ),
           child: TextField(
             controller: _searchController,
-            style: const TextStyle(fontSize: 14),
+            style: TextStyle(fontSize: 14, color: cs.onSurface),
             decoration: InputDecoration(
               hintText: 'Search movies, TV shows...',
               hintStyle: TextStyle(
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                color: cs.onSurface.withValues(alpha: 0.4),
                 fontSize: 14,
               ),
-              prefixIcon: Icon(
-                Icons.search,
-                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.7),
-                size: 20,
-              ),
+              prefixIcon: Icon(Icons.search,
+                  color: cs.primary.withValues(alpha: 0.6), size: 20),
               suffixIcon: _isLoadingSearch
                   ? Container(
-                      padding: const EdgeInsets.all(14.0),
+                      padding: const EdgeInsets.all(14),
                       width: 20,
                       height: 20,
-                      child: const CircularProgressIndicator(strokeWidth: 2),
-                    )
+                      child: const CircularProgressIndicator(strokeWidth: 2))
                   : IconButton(
                       icon: const Icon(Icons.clear, size: 18),
-                      onPressed: () {
-                        _searchController.clear();
-                      },
+                      onPressed: () => _searchController.clear(),
                     ),
               border: InputBorder.none,
               contentPadding: const EdgeInsets.symmetric(vertical: 14),
@@ -516,44 +648,103 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
   }
 
   Widget _buildProviderSelector(BuildContext context, AppState appState) {
-    return IconButton(
-      icon: const Icon(Icons.filter_list),
-      onPressed: () => _showProviderSelection(context, appState),
-      tooltip: 'Select Providers',
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.3),
+        ),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: Container(
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.white.withValues(alpha: 0.06)
+                : Colors.white.withValues(alpha: 0.5),
+            child: IconButton(
+              icon: const Icon(Icons.filter_list, size: 20),
+              onPressed: () => _showProviderSelection(context, appState),
+              tooltip: 'Select Providers',
+            ),
+          ),
+        ),
+      ),
     );
   }
 
   void _showProviderSelection(BuildContext context, AppState appState) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        height: MediaQuery.of(context).size.height * 0.7,
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Column(
-          children: [
-            const SizedBox(height: 12),
-            Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.withValues(alpha: 0.3), borderRadius: BorderRadius.circular(2))),
-            const SizedBox(height: 16),
-            const Text('Search Providers', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            const Divider(),
-            Expanded(
-              child: ListView(
-                children: TorrentSearchProvider.values.map((p) {
-                  final isSelected = appState.selectedTorrentProviders.contains(p);
-                  return CheckboxListTile(
-                    title: Text(p.name.toUpperCase()),
-                    value: isSelected,
-                    onChanged: (val) => appState.toggleTorrentProvider(p),
-                  );
-                }).toList(),
+      builder: (ctx) => ClipRRect(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+          child: Container(
+            height: MediaQuery.of(context).size.height * 0.7,
+            decoration: BoxDecoration(
+              color: isDark
+                  ? Colors.grey.shade900.withValues(alpha: 0.9)
+                  : Colors.white.withValues(alpha: 0.9),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+              border: Border(
+                top: BorderSide(
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.1)
+                      : Colors.white.withValues(alpha: 0.5),
+                ),
               ),
             ),
-          ],
+            child: Column(
+              children: [
+                const SizedBox(height: 12),
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.white.withValues(alpha: 0.2) : Colors.black.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text('Search Providers',
+                    style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 17,
+                        letterSpacing: -0.3,
+                        color: isDark ? Colors.white : Colors.black)),
+                const SizedBox(height: 8),
+                const Divider(height: 1),
+                Expanded(
+                  child: ListView.separated(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    itemCount: TorrentSearchProvider.values.length,
+                    separatorBuilder: (_, __) => Divider(
+                      height: 1,
+                      indent: 56,
+                      color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.2),
+                    ),
+                    itemBuilder: (context, index) {
+                      final p = TorrentSearchProvider.values[index];
+                      final isSelected = appState.selectedTorrentProviders.contains(p);
+                      return CheckboxListTile(
+                        title: Text(p.name.toUpperCase(),
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                        value: isSelected,
+                        onChanged: (val) => appState.toggleTorrentProvider(p),
+                        activeColor: Theme.of(context).colorScheme.primary,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -561,9 +752,7 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
 
   Future<void> _performSearch(String query, AppState appState) async {
     if (query.isEmpty) return;
-    setState(() {
-      _isLoadingSearch = true;
-    });
+    setState(() => _isLoadingSearch = true);
 
     final results = await TorrentService.searchAll(
       query,
@@ -588,16 +777,8 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
       itemCount: _searchResults.length,
       itemBuilder: (context, index) {
         final res = _searchResults[index];
-        return Container(
+        return _glassContainer(
           margin: const EdgeInsets.only(bottom: 14),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: cs.surfaceContainerLow.withValues(alpha: 0.6),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: cs.outlineVariant.withValues(alpha: 0.25),
-            ),
-          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -621,8 +802,9 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: cs.primaryContainer.withValues(alpha: 0.5),
+                      color: cs.primary.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: cs.primary.withValues(alpha: 0.2)),
                     ),
                     child: Text(
                       res.provider.toUpperCase(),
@@ -636,66 +818,41 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
                   ),
                 ],
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 12),
               Row(
                 children: [
-                  _infoBadge(Icons.storage_outlined, res.size, cs.onSurface.withValues(alpha: 0.6)),
+                  _infoBadge(Icons.storage_outlined, res.size, cs.onSurface.withValues(alpha: 0.5)),
                   const SizedBox(width: 20),
                   _infoBadge(Icons.arrow_upward, res.seeds, Colors.green),
                   const SizedBox(width: 20),
                   _infoBadge(Icons.arrow_downward, res.peers, Colors.orange),
                 ],
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(
                   children: [
-                    _actionButtonCompact(
-                      label: 'Magnet',
-                      icon: Icons.copy_rounded,
-                      color: cs.primary,
-                      onPressed: () async {
-                        await Clipboard.setData(ClipboardData(text: res.magnet));
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: const Text('Magnet link copied to clipboard'),
-                              behavior: SnackBarBehavior.floating,
-                              backgroundColor: cs.inverseSurface,
-                            ),
-                          );
-                        }
-                      },
-                    ),
+                    _actionButtonCompact(label: 'Magnet', icon: Icons.copy_rounded, color: cs.primary, onPressed: () async {
+                      await Clipboard.setData(ClipboardData(text: res.magnet));
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: const Text('Magnet link copied to clipboard'),
+                            behavior: SnackBarBehavior.floating,
+                            backgroundColor: cs.inverseSurface,
+                          ),
+                        );
+                      }
+                    }),
                     const SizedBox(width: 8),
-                    _actionButtonCompact(
-                      label: 'Stream',
-                      icon: Icons.play_arrow_rounded,
-                      color: Colors.green,
-                      onPressed: () => _handleNewTorrent(context, res.title, res.magnet, res.size, autoStream: true),
-                    ),
+                    _actionButtonCompact(label: 'Stream', icon: Icons.play_arrow_rounded, color: Colors.green, onPressed: () => _handleNewTorrent(context, res.title, res.magnet, res.size, autoStream: true)),
                     const SizedBox(width: 8),
-                    _actionButtonCompact(
-                      label: 'VLC',
-                      icon: Icons.video_library_rounded,
-                      color: Colors.purple,
-                      onPressed: () => _handleExternalPlayerSearch(context, res.title, res.magnet),
-                    ),
+                    _actionButtonCompact(label: 'VLC', icon: Icons.video_library_rounded, color: Colors.purple, onPressed: () => _handleExternalPlayerSearch(context, res.title, res.magnet)),
                     const SizedBox(width: 8),
-                    _actionButtonCompact(
-                      label: '1DM',
-                      icon: Icons.download_rounded,
-                      color: Colors.orange,
-                      onPressed: () => _launchExternal(res.magnet),
-                    ),
+                    _actionButtonCompact(label: '1DM', icon: Icons.download_rounded, color: Colors.orange, onPressed: () => _launchExternal(res.magnet)),
                     const SizedBox(width: 8),
-                    _actionButtonCompact(
-                      label: 'Add',
-                      icon: Icons.add_rounded,
-                      color: cs.onSurface.withValues(alpha: 0.6),
-                      onPressed: () => _handleNewTorrent(context, res.title, res.magnet, res.size),
-                    ),
+                    _actionButtonCompact(label: 'Add', icon: Icons.add_rounded, color: cs.onSurface.withValues(alpha: 0.5), onPressed: () => _handleNewTorrent(context, res.title, res.magnet, res.size)),
                   ],
                 ),
               ),
@@ -710,15 +867,11 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 14, color: color.withValues(alpha: 0.7)),
+        Icon(icon, size: 13, color: color),
         const SizedBox(width: 4),
         Text(
           label,
-          style: TextStyle(
-            fontSize: 11,
-            color: color.withValues(alpha: 0.9),
-            fontWeight: FontWeight.w500,
-          ),
+          style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w500),
         ),
       ],
     );
@@ -729,26 +882,22 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
       color: Colors.transparent,
       child: InkWell(
         onTap: onPressed,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(12),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
           decoration: BoxDecoration(
             color: color.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(12),
             border: Border.all(color: color.withValues(alpha: 0.2)),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 14, color: color),
+              Icon(icon, size: 13, color: color),
               const SizedBox(width: 6),
               Text(
                 label,
-                style: TextStyle(
-                  fontSize: 11,
-                  color: color,
-                  fontWeight: FontWeight.w600,
-                ),
+                style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w600),
               ),
             ],
           ),
@@ -767,35 +916,31 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
   }
 
   Future<void> _handleExternalPlayerSearch(BuildContext context, String title, String magnet) async {
-     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Starting engine for external play...')));
-     final provider = context.read<TorrentProvider>();
-     final appState = context.read<AppState>();
-     
-     // Check if already exists
-     String? id;
-     final existing = provider.torrents.where((t) => t.magnetLink == magnet).toList();
-     if (existing.isNotEmpty) {
-       id = existing.first.id;
-     } else {
-       // Add it temporarily
-       await provider.addTorrent(title, magnet, appState.defaultSavePath, '0', isSequential: true);
-       id = provider.torrents.first.id;
-     }
-     
-     // Wait for task initialization
-     await Future.delayed(const Duration(seconds: 3));
-     final url = await provider.startStreaming(id);
-     if (url != null) {
-       _launchExternal(url);
-     } else {
-       if (context.mounted) {
-         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to start stream server.')));
-       }
-     }
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Starting engine for external play...')));
+    final provider = context.read<TorrentProvider>();
+    final appState = context.read<AppState>();
+
+    String? id;
+    final existing = provider.torrents.where((t) => t.magnetLink == magnet).toList();
+    if (existing.isNotEmpty) {
+      id = existing.first.id;
+    } else {
+      await provider.addTorrent(title, magnet, appState.defaultSavePath, '0', isSequential: true);
+      id = provider.torrents.first.id;
+    }
+
+    await Future.delayed(const Duration(seconds: 3));
+    final url = await provider.startStreaming(id);
+    if (url != null) {
+      _launchExternal(url);
+    } else {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to start stream server.')));
+      }
+    }
   }
 
-  void _handleNewTorrent(
-      BuildContext context, String title, String magnet, String size, {bool autoStream = false}) {
+  void _handleNewTorrent(BuildContext context, String title, String magnet, String size, {bool autoStream = false}) {
     bool isSequential = autoStream;
     Uint8List? metadata;
     bool isFetchingMetadata = false;
@@ -803,44 +948,43 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-          title: const Text('Add Torrent', style: TextStyle(fontWeight: FontWeight.bold)),
-          content: Column(
+        builder: (context, setDialogState) => _buildGlassDialog(
+          title: 'Add Torrent',
+          icon: Icons.download_rounded,
+          iconColor: Theme.of(context).colorScheme.primary,
+          content: '',
+          actions: [],
+          customContent: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                title,
-                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
+              Text(title,
+                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis),
               const SizedBox(height: 20),
-              Container(
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surfaceContainer,
-                  borderRadius: BorderRadius.circular(16),
-                ),
+              _glassContainer(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                 child: SwitchListTile(
                   title: const Text('Sequential Download', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
                   subtitle: const Text('Stream while downloading', style: TextStyle(fontSize: 12)),
                   value: isSequential,
                   onChanged: (val) => setDialogState(() => isSequential = val),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  contentPadding: EdgeInsets.zero,
                 ),
               ),
               const SizedBox(height: 16),
               if (isFetchingMetadata)
-                Center(
+                const Center(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 20),
+                    padding: EdgeInsets.symmetric(vertical: 20),
                     child: Column(
                       children: [
-                        const CircularProgressIndicator(strokeWidth: 3),
-                        const SizedBox(height: 12),
+                        CircularProgressIndicator(strokeWidth: 3),
+                        SizedBox(height: 12),
                         Text('Fetching metadata...',
-                            style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6))),
+                            style: TextStyle(fontSize: 13)),
                       ],
                     ),
                   ),
@@ -867,10 +1011,8 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
                           _showFileSelection(context, title, metadata!);
                         } else {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Failed to fetch metadata. Check your connection.'),
-                              behavior: SnackBarBehavior.floating,
-                            ),
+                            const SnackBar(content: Text('Failed to fetch metadata. Check your connection.'),
+                                behavior: SnackBarBehavior.floating),
                           );
                         }
                       }
@@ -878,31 +1020,32 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
                     icon: const Icon(Icons.list_rounded, size: 20),
                     label: const Text('Select Specific Files'),
                     style: OutlinedButton.styleFrom(
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        side: BorderSide(
+                          color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.5),
+                        ),
+                      ),
                       padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
                   ),
                 ),
             ],
           ),
-          actions: [
+          dialogActions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: Text('Cancel', style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6))),
+              child: Text('Cancel',
+                  style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6))),
             ),
-            ElevatedButton(
+            _glassButton(
+              label: autoStream ? 'Stream Now' : 'Add',
               onPressed: () async {
-                final appState = context.read<AppState>();
+                final aState = context.read<AppState>();
                 final provider = context.read<TorrentProvider>();
-                await provider.addTorrent(
-                      title,
-                      magnet,
-                      appState.defaultSavePath,
-                      size,
-                      isSequential: isSequential,
-                      metadata: metadata,
-                    );
-                
+                await provider.addTorrent(title, magnet, aState.defaultSavePath, size,
+                    isSequential: isSequential, metadata: metadata);
+
                 if (context.mounted) {
                   Navigator.pop(ctx);
                   if (autoStream) {
@@ -910,21 +1053,12 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
                     _handleStream(context, item.id, item.name);
                   } else {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Torrent added successfully'),
-                        behavior: SnackBarBehavior.floating,
-                      ),
+                      const SnackBar(content: Text('Torrent added successfully'),
+                          behavior: SnackBarBehavior.floating),
                     );
                   }
                 }
               },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Theme.of(context).colorScheme.primary,
-                foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                elevation: 0,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              child: Text(autoStream ? 'Stream Now' : 'Add'),
             ),
           ],
         ),
@@ -932,100 +1066,102 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
     );
   }
 
-  void _showFileSelection(
-      BuildContext context, String title, Uint8List metadata) {
+  void _showFileSelection(BuildContext context, String title, Uint8List metadata) {
     final model = TorrentParser.parseBytes(metadata);
     final files = model.files;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        height: MediaQuery.of(context).size.height * 0.7,
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Column(
-          children: [
-            const SizedBox(height: 12),
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey.withValues(alpha: 0.3),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 20),
-            const Text(
-              'Select Files',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8.0),
-              child: Text(
-                title,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+      builder: (ctx) => ClipRRect(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+          child: Container(
+            height: MediaQuery.of(context).size.height * 0.7,
+            decoration: BoxDecoration(
+              color: isDark
+                  ? Colors.grey.shade900.withValues(alpha: 0.9)
+                  : Colors.white.withValues(alpha: 0.9),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+              border: Border(
+                top: BorderSide(
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.1)
+                      : Colors.white.withValues(alpha: 0.5),
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
               ),
             ),
-            const Divider(),
-            Expanded(
-              child: ListView.builder(
-                itemCount: files.length,
-                itemBuilder: (context, i) {
-                  final file = files[i];
-                  final isVideo = file.name.toLowerCase().endsWith('.mp4') ||
-                      file.name.toLowerCase().endsWith('.mkv') ||
-                      file.name.toLowerCase().endsWith('.avi');
-                  
-                  return CheckboxListTile(
-                    title: Text(file.name, style: const TextStyle(fontSize: 14)),
-                    secondary: Icon(isVideo ? Icons.video_file_rounded : Icons.insert_drive_file_rounded,
-                        color: isVideo ? Colors.blue : Colors.grey),
-                    subtitle: Text(TorrentService.formatBytes(file.length), style: const TextStyle(fontSize: 12)),
-                    value: true,
-                    onChanged: (val) {
-                      // Implementation for partial metadata select maybe later
-                    },
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  );
-                },
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              child: SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Theme.of(context).colorScheme.primary,
-                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    elevation: 0,
+            child: Column(
+              children: [
+                const SizedBox(height: 12),
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.white.withValues(alpha: 0.2) : Colors.black.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(2),
                   ),
-                  child: const Text('Confirm Selection', style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
-              ),
+                const SizedBox(height: 20),
+                const Text('Select Files',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, letterSpacing: -0.5)),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 24),
+                  child: Text(
+                    title,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 13,
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const Divider(height: 1),
+                Expanded(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    itemCount: files.length,
+                    itemBuilder: (context, i) {
+                      final file = files[i];
+                      final isVideo = file.name.toLowerCase().endsWith('.mp4') ||
+                          file.name.toLowerCase().endsWith('.mkv') ||
+                          file.name.toLowerCase().endsWith('.avi');
+                      return CheckboxListTile(
+                        title: Text(file.name, style: const TextStyle(fontSize: 14)),
+                        secondary: Icon(
+                          isVideo ? Icons.video_file_rounded : Icons.insert_drive_file_rounded,
+                          color: isVideo ? Colors.blue : Colors.grey),
+                        subtitle: Text(TorrentService.formatBytes(file.length),
+                            style: const TextStyle(fontSize: 12)),
+                        value: true,
+                        onChanged: (val) {},
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      );
+                    },
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: _glassButton(
+                      label: 'Confirm Selection',
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildTorrentItem(
-      BuildContext context, TorrentItem t, TorrentProvider provider) {
+  Widget _buildTorrentItem(BuildContext context, TorrentItem t, TorrentProvider provider) {
     final isDownloading = t.status == TorrentStatus.downloading;
     final isPaused = t.status == TorrentStatus.paused;
     final isCompleted = t.status == TorrentStatus.completed;
@@ -1036,16 +1172,8 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
     if (isPaused) statusColor = Colors.orange;
     if (t.status == TorrentStatus.error) statusColor = cs.error;
 
-    return Container(
+    return _glassContainer(
       margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerLow.withValues(alpha: 0.6),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: cs.outlineVariant.withValues(alpha: 0.25),
-        ),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1058,7 +1186,9 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  isCompleted ? Icons.check_rounded : (isPaused ? Icons.pause_rounded : Icons.download_rounded),
+                  isCompleted
+                      ? Icons.check_rounded
+                      : (isPaused ? Icons.pause_rounded : Icons.download_rounded),
                   color: statusColor,
                   size: 20,
                 ),
@@ -1070,39 +1200,31 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
                   children: [
                     Text(
                       t.name,
-                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: cs.onSurface),
+                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: cs.onSurface, letterSpacing: -0.2),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 2),
                     Text(
                       '${t.size} • ${t.status.name.toUpperCase()}',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: cs.onSurface.withValues(alpha: 0.6),
-                        fontWeight: FontWeight.w500,
-                      ),
+                      style: TextStyle(fontSize: 11, color: cs.onSurface.withValues(alpha: 0.5), fontWeight: FontWeight.w500),
                     ),
                   ],
                 ),
               ),
               PopupMenuButton(
-                icon: Icon(Icons.more_vert_rounded, size: 20, color: cs.onSurface.withValues(alpha: 0.7)),
+                icon: Icon(Icons.more_vert_rounded, size: 20, color: cs.onSurface.withValues(alpha: 0.6)),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 itemBuilder: (ctx) => [
                   if (isPaused)
                     const PopupMenuItem(value: 'resume', child: Text('Resume'))
                   else if (isDownloading)
                     const PopupMenuItem(value: 'pause', child: Text('Pause')),
-                  const PopupMenuItem(
-                      value: 'stream', child: Text('Stream / Play Online')),
-                  const PopupMenuItem(
-                      value: 'details', child: Text('Torrent Details')),
-                  const PopupMenuItem(
-                      value: 'open', child: Text('Open Folder')),
+                  const PopupMenuItem(value: 'stream', child: Text('Stream / Play Online')),
+                  const PopupMenuItem(value: 'details', child: Text('Torrent Details')),
+                  const PopupMenuItem(value: 'open', child: Text('Open Folder')),
                   const PopupMenuItem(value: 'copy', child: Text('Copy Hash')),
-                  const PopupMenuItem(
-                      value: 'share', child: Text('Share Magnet')),
+                  const PopupMenuItem(value: 'share', child: Text('Share Magnet')),
                   const PopupMenuItem(value: 'delete', child: Text('Delete')),
                 ],
                 onSelected: (val) async {
@@ -1113,17 +1235,14 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
                   if (val == 'copy') {
                     await Clipboard.setData(ClipboardData(text: t.hash));
                     if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Hash copied!')));
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Hash copied!')));
                     }
                   }
                   if (val == 'share') {
                     Share.share(t.magnetLink, subject: 'Share Magnet Link');
                   }
                   if (val == 'stream') {
-                    if (context.mounted) {
-                      _handleStream(context, t.id, t.name);
-                    }
+                    if (context.mounted) _handleStream(context, t.id, t.name);
                   }
                   if (val == 'open') {
                     final uri = Uri.file(t.savePath);
@@ -1132,9 +1251,7 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
                     } else {
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                                content:
-                                    Text('Cannot open folder automatically.')));
+                            const SnackBar(content: Text('Cannot open folder automatically.')));
                       }
                     }
                   }
@@ -1144,10 +1261,10 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
           ),
           const SizedBox(height: 16),
           ClipRRect(
-            borderRadius: BorderRadius.circular(6),
+            borderRadius: BorderRadius.circular(8),
             child: LinearProgressIndicator(
               value: t.progress,
-              backgroundColor: cs.outlineVariant.withValues(alpha: 0.2),
+              backgroundColor: cs.outlineVariant.withValues(alpha: 0.15),
               color: statusColor,
               minHeight: 8,
             ),
@@ -1158,11 +1275,7 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
             children: [
               Text(
                 '${(t.progress * 100).toStringAsFixed(1)}%',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: statusColor,
-                ),
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: statusColor),
               ),
               if (isDownloading)
                 Row(
@@ -1171,11 +1284,7 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
                     const SizedBox(width: 4),
                     Text(
                       t.speed,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: statusColor,
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: TextStyle(fontSize: 12, color: statusColor, fontWeight: FontWeight.bold),
                     ),
                   ],
                 ),
@@ -1194,55 +1303,92 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-          title: const Text('Add Torrent Link', style: TextStyle(fontWeight: FontWeight.bold)),
-          content: Column(
+        builder: (context, setDialogState) => _buildGlassDialog(
+          title: 'Add Torrent Link',
+          icon: Icons.link,
+          iconColor: Theme.of(context).colorScheme.primary,
+          content: '',
+          actions: [],
+          customContent: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              TextField(
-                  controller: nameController,
-                  decoration: InputDecoration(
-                    hintText: 'Name (optional)',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  )),
-              const SizedBox(height: 12),
-              TextField(
-                  controller: linkController,
-                  decoration: InputDecoration(
-                    hintText: 'Magnet or .torrent URL',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  )),
-              const SizedBox(height: 16),
-              Container(
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surfaceContainer,
-                  borderRadius: BorderRadius.circular(12),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Colors.white.withValues(alpha: 0.06)
+                          : Colors.white.withValues(alpha: 0.5),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: TextField(
+                      controller: nameController,
+                      decoration: InputDecoration(
+                        hintText: 'Name (optional)',
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      ),
+                    ),
+                  ),
                 ),
+              ),
+              const SizedBox(height: 12),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Colors.white.withValues(alpha: 0.06)
+                          : Colors.white.withValues(alpha: 0.5),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: TextField(
+                      controller: linkController,
+                      decoration: InputDecoration(
+                        hintText: 'Magnet or .torrent URL',
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              _glassContainer(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                 child: SwitchListTile(
                   title: const Text('Sequential Download', style: TextStyle(fontSize: 14)),
                   value: isSequential,
                   onChanged: (val) => setDialogState(() => isSequential = val),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  contentPadding: EdgeInsets.zero,
                 ),
               ),
             ],
           ),
-          actions: [
+          dialogActions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: Text('Cancel', style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6))),
+              child: Text('Cancel',
+                  style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6))),
             ),
-            ElevatedButton(
+            _glassButton(
+              label: 'Add',
               onPressed: () {
                 if (linkController.text.isNotEmpty) {
                   final appState = context.read<AppState>();
                   context.read<TorrentProvider>().addTorrent(
-                        nameController.text.isEmpty
-                            ? 'New Torrent'
-                            : nameController.text,
+                        nameController.text.isEmpty ? 'New Torrent' : nameController.text,
                         linkController.text,
                         appState.defaultSavePath,
                         'Unknown size',
@@ -1251,13 +1397,6 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
                   Navigator.pop(ctx);
                 }
               },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Theme.of(context).colorScheme.primary,
-                foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                elevation: 0,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              child: const Text('Add'),
             ),
           ],
         ),
@@ -1266,6 +1405,7 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
   }
 
   void _showTorrentDetails(BuildContext context, TorrentItem t) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -1276,126 +1416,191 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
           final trackers = provider.getTrackers(t.id);
           final files = provider.getTaskFiles(t.id);
 
-          return Container(
-            height: MediaQuery.of(context).size.height * 0.85,
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-            ),
-            child: Column(
-              children: [
-                const SizedBox(height: 12),
-                Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                        color: Colors.grey.withValues(alpha: 0.3),
-                        borderRadius: BorderRadius.circular(2))),
-                const SizedBox(height: 20),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  t.name,
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, letterSpacing: -0.5),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Hash: ${t.hash.substring(0, 8)}...${t.hash.substring(t.hash.length - 8)}',
-                                  style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5), fontSize: 11, fontFeatures: const [FontFeature.tabularFigures()]),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          IconButton.filled(
-                            onPressed: () => _handleStream(context, t.id, t.name),
-                            icon: const Icon(Icons.play_arrow_rounded),
-                            style: IconButton.styleFrom(
-                              backgroundColor: Colors.green,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.all(12),
-                            ),
-                            tooltip: 'Stream Now',
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.surfaceContainer,
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Column(
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceAround,
-                              children: [
-                                _buildInfoCol('Size', t.size),
-                                _buildInfoCol('Status', t.status.name.toUpperCase()),
-                                _buildInfoCol('Peers', peers.length.toString()),
-                              ],
-                            ),
-                            const Divider(height: 24, thickness: 0.5),
-                            SwitchListTile(
-                              title: const Text('Sequential Download', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
-                              subtitle: const Text('Required for active streaming', style: TextStyle(fontSize: 11)),
-                              value: t.isSequential,
-                              onChanged: (val) => provider.toggleSequential(t.id),
-                              contentPadding: EdgeInsets.zero,
-                              visualDensity: VisualDensity.compact,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Expanded(
-                  child: DefaultTabController(
-                    length: 3,
-                    child: Column(
-                      children: [
-                        TabBar(
-                          tabs: const [
-                            Tab(text: 'Files'),
-                            Tab(text: 'Peers'),
-                            Tab(text: 'Trackers')
-                          ],
-                          indicatorColor: Theme.of(context).colorScheme.primary,
-                          labelColor: Theme.of(context).colorScheme.primary,
-                          unselectedLabelColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
-                          labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                          indicatorSize: TabBarIndicatorSize.tab,
-                          dividerColor: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.2),
-                        ),
-                        Expanded(
-                          child: TabBarView(
-                            children: [
-                              _buildFilesListTask(t.id, t.name, files),
-                              _buildPeersList(peers),
-                              _buildTrackersList(trackers),
-                            ],
-                          ),
-                        ),
-                      ],
+          return ClipRRect(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+              child: Container(
+                height: MediaQuery.of(context).size.height * 0.85,
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? Colors.grey.shade900.withValues(alpha: 0.92)
+                      : Colors.white.withValues(alpha: 0.92),
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+                  border: Border(
+                    top: BorderSide(
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.1)
+                          : Colors.white.withValues(alpha: 0.5),
                     ),
                   ),
                 ),
-              ],
+                child: Column(
+                  children: [
+                    const SizedBox(height: 12),
+                    Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: isDark ? Colors.white.withValues(alpha: 0.2) : Colors.black.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Expanded(
+                      child: ListView(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(t.name,
+                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, letterSpacing: -0.5),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Hash: ${t.hash.substring(0, 8)}...${t.hash.substring(t.hash.length - 8)}',
+                                      style: TextStyle(
+                                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+                                        fontSize: 11,
+                                        fontFeatures: const [FontFeature.tabularFigures()],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              IconButton.filled(
+                                onPressed: () => _handleStream(context, t.id, t.name),
+                                icon: const Icon(Icons.play_arrow_rounded),
+                                style: IconButton.styleFrom(
+                                  backgroundColor: Colors.green.withValues(alpha: 0.2),
+                                  foregroundColor: Colors.green,
+                                  padding: const EdgeInsets.all(12),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                    side: BorderSide(color: Colors.green.withValues(alpha: 0.3)),
+                                  ),
+                                ),
+                                tooltip: 'Stream Now',
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 24),
+                          _glassContainer(
+                            padding: const EdgeInsets.all(16),
+                            child: Row(
+                              children: [
+                                _detailStat(Icons.cloud_download_rounded, '${(t.progress * 100).toStringAsFixed(1)}%', 'Progress'),
+                                const SizedBox(width: 24),
+                                _detailStat(Icons.arrow_downward_rounded, t.speed, 'Speed'),
+                                const SizedBox(width: 24),
+                                _detailStat(Icons.storage_rounded, t.size, 'Size'),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          if (peers != null && peers.isNotEmpty) ...[
+                            Text('Peers',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 15,
+                                    letterSpacing: -0.3,
+                                    color: Theme.of(context).colorScheme.onSurface)),
+                            const SizedBox(height: 8),
+                            _glassContainer(
+                              padding: const EdgeInsets.all(12),
+                              child: Column(
+                                children: peers.take(5).toList().asMap().entries.map((e) => Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 4),
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.person_outline, size: 14, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text('Peer ${e.key + 1}',
+                                            style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7))),
+                                      ),
+                                    ],
+                                  ),
+                                )).toList(),
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                          ],
+                          if (trackers != null && trackers.isNotEmpty) ...[
+                            Text('Trackers',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 15,
+                                    letterSpacing: -0.3,
+                                    color: Theme.of(context).colorScheme.onSurface)),
+                            const SizedBox(height: 8),
+                            _glassContainer(
+                              padding: const EdgeInsets.all(12),
+                              child: Column(
+                                children: trackers.take(10).toList().asMap().entries.map((e) => Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 4),
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.dns_outlined, size: 14, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text('${e.value}',
+                                            style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7))),
+                                      ),
+                                    ],
+                                  ),
+                                )).toList(),
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                          ],
+                          if (files != null && files.isNotEmpty) ...[
+                            Text('Files',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 15,
+                                    letterSpacing: -0.3,
+                                    color: Theme.of(context).colorScheme.onSurface)),
+                            const SizedBox(height: 8),
+                            _glassContainer(
+                              padding: const EdgeInsets.all(12),
+                              child: Column(
+                                children: files.take(20).toList().asMap().entries.map((e) => Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 4),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        e.value.toLowerCase().contains(RegExp(r'\.(mp4|mkv|avi|mov)$'))
+                                            ? Icons.video_file_rounded
+                                            : Icons.insert_drive_file_rounded,
+                                        size: 16,
+                                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text('${e.value}',
+                                            style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7))),
+                                      ),
+                                    ],
+                                  ),
+                                )).toList(),
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           );
         },
@@ -1403,207 +1608,47 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildFilesListTask(
-      String id, String title, List<TorrentFileModel> files) {
-    if (files.isEmpty) {
-      return const Center(child: Text('Files metadata loading...'));
-    }
-    return ListView.builder(
-      itemCount: files.length,
-      itemBuilder: (context, i) {
-        final file = files[i];
-        final isVideo = file.name.toLowerCase().endsWith('.mp4') ||
-            file.name.toLowerCase().endsWith('.mkv') ||
-            file.name.toLowerCase().endsWith('.avi');
-
-        return ListTile(
-          leading: Icon(isVideo ? Icons.video_file : Icons.insert_drive_file,
-              color: isVideo ? Colors.blue : Colors.grey),
-          title: Text(file.name, style: const TextStyle(fontSize: 14)),
-          subtitle: Text(TorrentService.formatBytes(file.length)),
-          trailing: isVideo
-              ? IconButton(
-                  icon: const Icon(Icons.play_circle_outline, color: Colors.blue),
-                  onPressed: () => _handleStream(context, id, title,
-                      filePath: file.path),
-                )
-              : null,
-        );
-      },
-    );
-  }
-
-  Future<void> _handleStream(BuildContext context, String id, String title,
-      {String? filePath}) async {
-    final provider = context.read<TorrentProvider>();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Starting streaming server...')),
-    );
-
-    final url = await provider.startStreaming(id, filePath: filePath);
-    if (url != null && context.mounted) {
-      final allFiles = provider.getTaskFiles(id);
-      final videoFiles = allFiles.where((f) {
-        final name = f.name.toLowerCase();
-        return name.endsWith('.mp4') ||
-            name.endsWith('.mkv') ||
-            name.endsWith('.avi') ||
-            name.endsWith('.mov') ||
-            name.endsWith('.wmv') ||
-            name.endsWith('.flv');
-      }).toList();
-
-      List<Map<String, String>> playlist = [];
-      int initialIndex = 0;
-
-      if (videoFiles.isEmpty) {
-        // Fallback to single file if no videos detected (might be an unknown format)
-        playlist = [{ 'url': url, 'title': title }];
-      } else {
-        playlist = videoFiles.map((f) {
-          final fileUrl = 'http://127.0.0.1:9090/${Uri.encodeComponent(f.path)}';
-          return { 'url': fileUrl, 'title': f.name };
-        }).toList();
-        
-        if (filePath != null) {
-          initialIndex = videoFiles.indexWhere((f) => f.path == filePath);
-          if (initialIndex == -1) initialIndex = 0;
-        } else {
-           // Find which one is currently 'url' (usually the first one found by provider)
-           initialIndex = playlist.indexWhere((item) => item['url'] == url);
-           if (initialIndex == -1) initialIndex = 0;
-        }
-      }
-
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => MediaPlayerScreen(
-            url: playlist[initialIndex]['url']!,
-            title: playlist[initialIndex]['title']!,
-            playlist: playlist,
-            initialIndex: initialIndex,
-          ),
-        ),
-      );
-    } else if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to start streaming.')),
-      );
-    }
-  }
-
-  Widget _buildInfoCol(String label, String val) {
+  Widget _detailStat(IconData icon, String value, String label) {
+    final cs = Theme.of(context).colorScheme;
     return Column(
       children: [
-        Text(val, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+        Icon(icon, size: 20, color: cs.primary.withValues(alpha: 0.7)),
         const SizedBox(height: 4),
-        Text(
-          label.toUpperCase(),
-          style: TextStyle(
-            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
-            fontSize: 10,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 0.5,
-          ),
-        ),
+        Text(value,
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: cs.onSurface)),
+        Text(label,
+            style: TextStyle(fontSize: 11, color: cs.onSurface.withValues(alpha: 0.5))),
       ],
     );
   }
 
-  Widget _buildPeersList(List<dynamic> peers) {
-    if (peers.isEmpty) {
-      return _buildEmptyState('No active peers yet.', Icons.cloud_off_rounded);
-    }
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      itemCount: peers.length,
-      itemBuilder: (context, i) {
-        final peer = peers[i];
-        return ListTile(
-          leading: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(Icons.dns_rounded, size: 18, color: Theme.of(context).colorScheme.primary),
-          ),
-          title: Text(peer.address.address.address, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
-          subtitle: Text('Port: ${peer.address.port}', style: const TextStyle(fontSize: 12)),
-          trailing: Text(
-            '${(peer.currentDownloadSpeed / 1024).toStringAsFixed(1)} KB/s',
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.primary,
-              fontWeight: FontWeight.bold,
-              fontSize: 12,
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildTrackersList(List<String> trackers) {
-    if (trackers.isEmpty) {
-      return _buildEmptyState('No trackers found.', Icons.router_rounded);
-    }
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      itemCount: trackers.length,
-      itemBuilder: (context, i) => ListTile(
-        leading: Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(Icons.router_rounded, size: 18, color: Theme.of(context).colorScheme.secondary),
+  void _handleStream(BuildContext context, String id, String name) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => MediaPlayerScreen(
+          torrentId: id,
+          title: name,
         ),
-        title: Text(trackers[i], style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-        subtitle: Text('Status: Active', style: TextStyle(color: Colors.green.withValues(alpha: 0.7), fontSize: 11, fontWeight: FontWeight.bold)),
       ),
     );
   }
 }
 
 class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
-  _SliverAppBarDelegate(this._tabBar);
-
-  final TabBar _tabBar;
-
-  @override
-  double get minExtent => _tabBar.preferredSize.height;
-  @override
-  double get maxExtent => _tabBar.preferredSize.height;
+  final Widget child;
+  _SliverAppBarDelegate(this.child);
 
   @override
-  Widget build(
-      BuildContext context, double shrinkOffset, bool overlapsContent) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.8),
-        border: Border(
-          bottom: BorderSide(
-            color: Theme.of(context)
-                .colorScheme
-                .outlineVariant
-                .withValues(alpha: 0.1),
-            width: 0.5,
-          ),
-        ),
-      ),
-      child: ClipRect(
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: _tabBar,
-        ),
-      ),
-    );
+  double get minExtent => 48;
+  @override
+  double get maxExtent => 48;
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return child;
   }
 
   @override
-  bool shouldRebuild(_SliverAppBarDelegate oldDelegate) {
-    return false;
-  }
+  bool shouldRebuild(_SliverAppBarDelegate oldDelegate) => child != oldDelegate.child;
 }
