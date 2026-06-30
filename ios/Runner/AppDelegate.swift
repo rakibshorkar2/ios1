@@ -3,8 +3,6 @@ import UIKit
 
 @main
 @objc class AppDelegate: FlutterAppDelegate {
-    var backgroundCompletionHandler: (() -> Void)?
-
     override func application(
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
@@ -162,7 +160,6 @@ import UIKit
         handleEventsForBackgroundURLSession identifier: String,
         completionHandler: @escaping () -> Void
     ) {
-        backgroundCompletionHandler = completionHandler
-        _ = DownloadManager.shared
+        DownloadManager.shared.backgroundCompletionHandler = completionHandler
     }
 }

@@ -23,11 +23,13 @@ class DownloadManager: NSObject {
     private var proxyEnabled: Bool = false
     private var liveActivities: [String: Activity<DownloadActivityAttributes>] = [:]
     var liveActivityEnabled: Bool = true
+    var backgroundCompletionHandler: (() -> Void)?
 
     var eventSink: FlutterEventSink? {
         didSet {
             if eventSink != nil {
                 replayPendingEvents()
+                restorePendingTasks()
             }
         }
     }
@@ -52,9 +54,10 @@ class DownloadManager: NSObject {
         proxyUsername = username
         proxyPassword = password
         proxyEnabled = enabled
-        let newSession = createSession()
+        // Only recreate session if no active tasks — invalidating kills all downloads
+        guard activeTasks.isEmpty else { return }
         backgroundSession.invalidateAndCancel()
-        backgroundSession = newSession
+        backgroundSession = createSession()
     }
 
     private func createSession() -> URLSession {
@@ -67,6 +70,12 @@ class DownloadManager: NSObject {
             config.allowsExpensiveNetworkAccess = true
             config.allowsConstrainedNetworkAccess = true
         }
+        if #available(iOS 17.0, *) {
+            // Background sessions wait for connectivity by default on iOS 17+
+        } else {
+            config.waitsForConnectivity = true
+        }
+        config.timeoutIntervalForResource = 604800 // 7 days max for entire resource
         if proxyEnabled && !proxyHost.isEmpty && proxyPort > 0 {
             var proxyDict: [String: Any] = [
                 "SOCKSEnable": 1,
@@ -331,6 +340,7 @@ extension DownloadManager: URLSessionDownloadDelegate {
         taskIdMap.removeValue(forKey: downloadTask.taskIdentifier)
         progressMap.removeValue(forKey: downloadId)
         retryCountMap.removeValue(forKey: downloadId)
+        resumeDataMap.removeValue(forKey: downloadId)
         fileNameMap.removeValue(forKey: downloadId)
     }
 
@@ -387,11 +397,9 @@ extension DownloadManager: URLSessionDownloadDelegate {
     }
 
     func urlSessionDidFinishEvents(forBackgroundURLSession session: URLSession) {
-        DispatchQueue.main.async {
-            if let appDelegate = UIApplication.shared.delegate as? AppDelegate {
-                appDelegate.backgroundCompletionHandler?()
-                appDelegate.backgroundCompletionHandler = nil
-            }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            self.backgroundCompletionHandler?()
+            self.backgroundCompletionHandler = nil
         }
     }
 }
