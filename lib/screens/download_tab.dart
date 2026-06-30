@@ -872,9 +872,10 @@ class _DownloadTabState extends State<DownloadTab> {
     return '${val.toStringAsFixed(1)}${suffixes[i]}';
   }
 
-  String _formatStorageGB(int bytes) {
-    if (bytes <= 0) return '0 GB';
-    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
+  String _formatStorageGB(dynamic bytes) {
+    final b = (bytes is int ? bytes.toDouble() : bytes) as double;
+    if (b <= 0) return '0 GB';
+    return '${(b / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
   }
 
   String _formatSpeedAndETA(DownloadItem item) {
