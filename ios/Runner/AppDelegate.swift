@@ -6,6 +6,7 @@ import UIKit
     private var pendingFolderPickerResult: FlutterResult?
 
     private var rootViewController: UIViewController? {
+        if let window = self.window { return window.rootViewController }
         if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
            let window = windowScene.windows.first(where: { $0.isKeyWindow }) {
             return window.rootViewController
@@ -75,7 +76,8 @@ import UIKit
                 if let args = call.arguments as? [String: Any],
                    let path = args["path"] as? String {
                     let fileURL = URL(fileURLWithPath: path)
-                    if let rootVC = self.rootViewController {
+                    DispatchQueue.main.async { [weak self] in
+                        guard let rootVC = self?.rootViewController else { return }
                         let activityVC = UIActivityViewController(activityItems: [fileURL], applicationActivities: nil)
                         rootVC.present(activityVC, animated: true)
                     }
@@ -88,7 +90,8 @@ import UIKit
                 if let args = call.arguments as? [String: Any],
                    let urlStr = args["url"] as? String,
                    let url = URL(string: urlStr) {
-                    if let rootVC = self.rootViewController {
+                    DispatchQueue.main.async { [weak self] in
+                        guard let rootVC = self?.rootViewController else { return }
                         let activityVC = UIActivityViewController(activityItems: [url], applicationActivities: nil)
                         rootVC.present(activityVC, animated: true)
                     }
@@ -99,7 +102,8 @@ import UIKit
                 if let args = call.arguments as? [String: Any],
                    let path = args["path"] as? String {
                     let fileURL = URL(fileURLWithPath: path)
-                    if let rootVC = self.rootViewController {
+                    DispatchQueue.main.async { [weak self] in
+                        guard let rootVC = self?.rootViewController else { return }
                         let docPicker = UIDocumentPickerViewController(forExporting: [fileURL], asCopy: true)
                         rootVC.present(docPicker, animated: true)
                     }
@@ -110,13 +114,16 @@ import UIKit
 
             case "pickDownloadFolder":
                 self.pendingFolderPickerResult = result
-                if let rootVC = self.rootViewController {
-                    let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.folder])
-                    picker.delegate = self
-                    rootVC.present(picker, animated: true)
-                } else {
-                    self.pendingFolderPickerResult?(nil)
-                    self.pendingFolderPickerResult = nil
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                    guard let self = self else { return }
+                    if let rootVC = self.rootViewController {
+                        let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.folder])
+                        picker.delegate = self
+                        rootVC.present(picker, animated: true)
+                    } else {
+                        self.pendingFolderPickerResult?(nil)
+                        self.pendingFolderPickerResult = nil
+                    }
                 }
 
             case "getPersistentDownloadFolder":

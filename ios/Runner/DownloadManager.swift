@@ -66,12 +66,18 @@ class DownloadManager: NSObject {
     }
 
     func setProxy(host: String, port: Int, username: String, password: String, enabled: Bool, protocol proto: String = "http") {
+        let newProtocol = proto.lowercased()
+        // Skip if nothing changed (avoids tearing down session on every init)
+        guard proxyHost != host || proxyPort != port || proxyUsername != username ||
+              proxyPassword != password || proxyEnabled != enabled || proxyProtocol != newProtocol else {
+            return
+        }
         proxyHost = host
         proxyPort = port
         proxyUsername = username
         proxyPassword = password
         proxyEnabled = enabled
-        proxyProtocol = proto.lowercased()
+        proxyProtocol = newProtocol
         // Recreate session with new proxy if no active downloads
         guard activeTasks.isEmpty else { return }
         backgroundSession.invalidateAndCancel()
