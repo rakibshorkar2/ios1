@@ -892,7 +892,9 @@ class _DownloadTabState extends State<DownloadTab> {
   String _formatStorageGB(dynamic mb) {
     final b = (mb is int ? mb.toDouble() : mb) as double;
     if (b <= 0) return '0 GB';
-    return '${(b / 1024).toStringAsFixed(1)} GB';
+    // Plugin returns MiB (1024² bytes). Convert to decimal GB (1000³ bytes) to match iOS Settings.
+    final decimalGB = b * 1024 * 1024 / (1000 * 1000 * 1000);
+    return '${decimalGB.toStringAsFixed(1)} GB';
   }
 
   String _formatSpeedAndETA(DownloadItem item) {

@@ -182,6 +182,8 @@ class DownloadManager: NSObject {
                     if parts.count == 2 {
                         let downloadId = String(parts[0])
                         let fileName = String(parts[1])
+                        // Skip tasks already tracked from a fresh startDownload call
+                        if self.activeTasks[downloadId] != nil { continue }
                         self.activeTasks[downloadId] = downloadTask
                         self.taskIdMap[downloadTask.taskIdentifier] = downloadId
                         self.sendEvent(type: "restored", downloadId: downloadId, data: ["fileName": fileName])
