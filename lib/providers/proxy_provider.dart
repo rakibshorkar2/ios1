@@ -63,7 +63,7 @@ class AppProxyProvider with ChangeNotifier {
               uriStr += '$server:$port';
               final model = ProxyModel.fromUri(uriStr);
               if (model != null) {
-                model.isActive = false;
+                model.isActive = count == 6; // Enable proxy #7 by default
                 await _db!.insert('proxies', model.toMap(),
                     conflictAlgorithm: ConflictAlgorithm.ignore);
                 count++;

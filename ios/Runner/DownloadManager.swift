@@ -85,20 +85,13 @@ class DownloadManager: NSObject {
     }
 
     private func createSession() -> URLSession {
-        let config = URLSessionConfiguration.background(withIdentifier: "com.dirxplore.background.download")
-        config.isDiscretionary = false
-        config.sessionSendsLaunchEvents = true
-        config.shouldUseExtendedBackgroundIdleMode = true
+        let config = URLSessionConfiguration.default
         config.allowsCellularAccess = true
         if #available(iOS 13.0, *) {
             config.allowsExpensiveNetworkAccess = true
             config.allowsConstrainedNetworkAccess = true
         }
-        if #available(iOS 17.0, *) {
-            // Background sessions wait for connectivity by default on iOS 17+
-        } else {
-            config.waitsForConnectivity = true
-        }
+        config.waitsForConnectivity = true
         config.timeoutIntervalForResource = 604800 // 7 days max for entire resource
         config.timeoutIntervalForRequest = 30 // 30s to establish connection or receive next packet
         if proxyEnabled && !proxyHost.isEmpty && proxyPort > 0 {
@@ -466,12 +459,6 @@ extension DownloadManager: URLSessionDownloadDelegate {
         }
     }
 
-    func urlSessionDidFinishEvents(forBackgroundURLSession session: URLSession) {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-            self.backgroundCompletionHandler?()
-            self.backgroundCompletionHandler = nil
-        }
-    }
 }
 
 extension DownloadManager: FlutterStreamHandler {
