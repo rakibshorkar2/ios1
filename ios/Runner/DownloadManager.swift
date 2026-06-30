@@ -94,6 +94,7 @@ class DownloadManager: NSObject {
             config.waitsForConnectivity = true
         }
         config.timeoutIntervalForResource = 604800 // 7 days max for entire resource
+        config.timeoutIntervalForRequest = 30 // 30s to establish connection or receive next packet
         if proxyEnabled && !proxyHost.isEmpty && proxyPort > 0 {
             var proxyDict: [String: Any]
             switch proxyProtocol {
@@ -244,11 +245,21 @@ class DownloadManager: NSObject {
     private func sendEvent(type: String, downloadId: String, data: [String: Any]) {
         var event: [String: Any] = ["type": type, "downloadId": downloadId]
         event.merge(data) { (_, new) in new }
-        guard let sink = eventSink else {
-            pendingEvents.append(event)
-            return
+        if Thread.isMainThread {
+            guard let sink = eventSink else {
+                pendingEvents.append(event)
+                return
+            }
+            sink(event)
+        } else {
+            DispatchQueue.main.async { [weak self] in
+                guard let sink = self?.eventSink else {
+                    self?.pendingEvents.append(event)
+                    return
+                }
+                sink(event)
+            }
         }
-        sink(event)
     }
 
     private func sendProgress(downloadId: String, received: Int64, total: Int64) {
@@ -460,7 +471,6 @@ extension DownloadManager: URLSessionDownloadDelegate {
 extension DownloadManager: FlutterStreamHandler {
     func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink) -> FlutterError? {
         self.eventSink = events
-        restorePendingTasks()
         return nil
     }
 

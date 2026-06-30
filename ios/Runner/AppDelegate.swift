@@ -3,7 +3,15 @@ import UIKit
 
 @main
 @objc class AppDelegate: FlutterAppDelegate {
-    var pendingFolderPickerResult: FlutterResult?
+    private var pendingFolderPickerResult: FlutterResult?
+
+    private var rootViewController: UIViewController? {
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let window = windowScene.windows.first(where: { $0.isKeyWindow }) {
+            return window.rootViewController
+        }
+        return nil
+    }
     override func application(
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
@@ -67,7 +75,7 @@ import UIKit
                 if let args = call.arguments as? [String: Any],
                    let path = args["path"] as? String {
                     let fileURL = URL(fileURLWithPath: path)
-                    if let rootVC = UIApplication.shared.keyWindow?.rootViewController {
+                    if let rootVC = self.rootViewController {
                         let activityVC = UIActivityViewController(activityItems: [fileURL], applicationActivities: nil)
                         rootVC.present(activityVC, animated: true)
                     }
@@ -80,11 +88,9 @@ import UIKit
                 if let args = call.arguments as? [String: Any],
                    let urlStr = args["url"] as? String,
                    let url = URL(string: urlStr) {
-                    DispatchQueue.main.async {
-                        if let rootVC = UIApplication.shared.keyWindow?.rootViewController {
-                            let activityVC = UIActivityViewController(activityItems: [url], applicationActivities: nil)
-                            rootVC.present(activityVC, animated: true)
-                        }
+                    if let rootVC = self.rootViewController {
+                        let activityVC = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+                        rootVC.present(activityVC, animated: true)
                     }
                 }
                 result(nil)
@@ -93,11 +99,9 @@ import UIKit
                 if let args = call.arguments as? [String: Any],
                    let path = args["path"] as? String {
                     let fileURL = URL(fileURLWithPath: path)
-                    DispatchQueue.main.async {
-                        if let rootVC = UIApplication.shared.keyWindow?.rootViewController {
-                            let docPicker = UIDocumentPickerViewController(forExporting: [fileURL], asCopy: true)
-                            rootVC.present(docPicker, animated: true)
-                        }
+                    if let rootVC = self.rootViewController {
+                        let docPicker = UIDocumentPickerViewController(forExporting: [fileURL], asCopy: true)
+                        rootVC.present(docPicker, animated: true)
                     }
                     result(true)
                 } else {
@@ -106,15 +110,13 @@ import UIKit
 
             case "pickDownloadFolder":
                 self.pendingFolderPickerResult = result
-                DispatchQueue.main.async {
-                    if let rootVC = UIApplication.shared.keyWindow?.rootViewController {
-                        let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.folder])
-                        picker.delegate = self
-                        rootVC.present(picker, animated: true)
-                    } else {
-                        self.pendingFolderPickerResult?(nil)
-                        self.pendingFolderPickerResult = nil
-                    }
+                if let rootVC = self.rootViewController {
+                    let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.folder])
+                    picker.delegate = self
+                    rootVC.present(picker, animated: true)
+                } else {
+                    self.pendingFolderPickerResult?(nil)
+                    self.pendingFolderPickerResult = nil
                 }
 
             case "getPersistentDownloadFolder":
