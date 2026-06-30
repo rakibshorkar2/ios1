@@ -28,6 +28,8 @@ class DownloadProvider with ChangeNotifier {
       EventChannel('com.dirxplore/ios_download_events');
   static const MethodChannel _liveActivityChannel =
       MethodChannel('com.dirxplore/live_activity');
+  static const MethodChannel _iosNotificationChannel =
+      MethodChannel('com.dirxplore/notifications');
   StreamSubscription? _iosEventSub;
 
   final bool _isIOS = Platform.isIOS;
@@ -615,6 +617,7 @@ class DownloadProvider with ChangeNotifier {
     item.status = DownloadStatus.downloading;
     notifyListeners();
     await DatabaseHelper().updateDownload(item);
+    _liveActivityStart(item.id, item.fileName);
 
     // Start Foreground Service (Android only)
     if (!_isIOS) {
@@ -665,6 +668,9 @@ class DownloadProvider with ChangeNotifier {
         item.totalBytes = total;
         _cancelTokens.remove(item.id);
         await updateStorageInfo();
+      _liveActivityEnd(item.id, "Complete");
+      _showiOSNotification("Download Complete", item.fileName);
+        _showiOSNotification("Download Complete", item.fileName);
 
         if (!_isIOS) {
           _channel.invokeMethod('stopForegroundService', {
@@ -693,6 +699,7 @@ class DownloadProvider with ChangeNotifier {
       item.downloadedBytes = item.totalBytes;
       _cancelTokens.remove(item.id);
       await updateStorageInfo();
+      _liveActivityEnd(item.id, "Complete");
 
       if (!_isIOS) {
         _channel.invokeMethod('stopForegroundService', {
@@ -794,6 +801,7 @@ class DownloadProvider with ChangeNotifier {
       'size':
           '${_formatSize(item.downloadedBytes)} / ${_formatSize(item.totalBytes)}',
     }).catchError((e) { debugPrint('Channel method error: $e'); });
+    _liveActivityUpdate(item.id, item.downloadedBytes, item.totalBytes);
 
     final now = DateTime.now();
     if (now.difference(_lastNotifyTime).inMilliseconds > 250) {
@@ -808,7 +816,10 @@ class DownloadProvider with ChangeNotifier {
   }
 
   void _handleDownloadError(DownloadItem item, dynamic e) {
-    if (e is DioException && CancelToken.isCancel(e)) return;
+    if (e is DioException && CancelToken.isCancel(e)) {
+      _liveActivityEnd(item.id, "Cancelled");
+      return;
+    }
 
     if (item.retryCount < 3) {
       item.retryCount++;
@@ -816,6 +827,8 @@ class DownloadProvider with ChangeNotifier {
     } else {
       item.status = DownloadStatus.error;
       item.errorMessage = e.toString();
+      _liveActivityEnd(item.id, "Failed");
+      _showiOSNotification("Download Failed", item.fileName);
     }
     DatabaseHelper().updateDownload(item);
   }
@@ -860,6 +873,39 @@ class DownloadProvider with ChangeNotifier {
     } catch (_) {
       return false;
     }
+  }
+
+  void _liveActivityStart(String downloadId, String fileName) {
+    if (!_isIOS) return;
+    _liveActivityChannel.invokeMethod('start', {
+      'downloadId': downloadId,
+      'fileName': fileName,
+    }).catchError((_) {});
+  }
+
+  void _liveActivityUpdate(String downloadId, int received, int total) {
+    if (!_isIOS) return;
+    _liveActivityChannel.invokeMethod('update', {
+      'downloadId': downloadId,
+      'received': received,
+      'total': total,
+    }).catchError((_) {});
+  }
+
+  void _liveActivityEnd(String downloadId, String status) {
+    if (!_isIOS) return;
+    _liveActivityChannel.invokeMethod('end', {
+      'downloadId': downloadId,
+      'status': status,
+    }).catchError((_) {});
+  }
+
+  void _showiOSNotification(String title, String body) {
+    if (!_isIOS) return;
+    _iosNotificationChannel.invokeMethod('show', {
+      'title': title,
+      'body': body,
+    }).catchError((_) {});
   }
 
   Future<void> enableLiveActivity() async {

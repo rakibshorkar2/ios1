@@ -271,8 +271,9 @@ class DownloadManager: NSObject {
 
     // MARK: - Live Activities
 
-    private func startLiveActivity(downloadId: String, fileName: String) {
+    func startLiveActivity(downloadId: String, fileName: String) {
         guard #available(iOS 16.2, *), liveActivityEnabled else { return }
+        fileNameMap[downloadId] = fileName
         let attributes = DownloadActivityAttributes(downloadId: downloadId)
         let state = DownloadActivityAttributes.ContentState(
             fileName: fileName,
@@ -294,7 +295,7 @@ class DownloadManager: NSObject {
         }
     }
 
-    private func updateLiveActivity(downloadId: String, received: Int64, total: Int64) {
+    func updateLiveActivity(downloadId: String, received: Int64, total: Int64) {
         guard #available(iOS 16.2, *),
               let activity = liveActivities[downloadId] else { return }
         let fileName = fileNameMap[downloadId] ?? "Download"
@@ -310,7 +311,7 @@ class DownloadManager: NSObject {
         }
     }
 
-    private func endLiveActivity(downloadId: String, status: String) {
+    func endLiveActivity(downloadId: String, status: String) {
         guard #available(iOS 16.2, *),
               let activity = liveActivities.removeValue(forKey: downloadId) else { return }
 
