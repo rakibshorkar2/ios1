@@ -166,16 +166,16 @@ class _DownloadTabState extends State<DownloadTab> {
   Widget _buildStorageAnalyzer() {
     final dlProvider = context.watch<DownloadProvider>();
     final appState = context.watch<AppState>();
-    final totalMB = dlProvider.totalStorage;
-    final freeMB = dlProvider.freeStorage;
+    final totalBytes = dlProvider.totalStorage;
+    final freeBytes = dlProvider.freeStorage;
     final cs = Theme.of(context).colorScheme;
     final isAmoled = appState.trueAmoledDark &&
         Theme.of(context).brightness == Brightness.dark;
 
-    if (totalMB <= 0) return const SizedBox.shrink();
+    if (totalBytes <= 0) return const SizedBox.shrink();
 
-    final usedMB = totalMB - freeMB;
-    final progress = totalMB > 0 ? (usedMB / totalMB) : 0.0;
+    final usedBytes = totalBytes - freeBytes;
+    final progress = totalBytes > 0 ? (usedBytes / totalBytes) : 0.0;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
@@ -194,7 +194,7 @@ class _DownloadTabState extends State<DownloadTab> {
                       fontSize: 13,
                       color: cs.onSurface)),
               Text(
-                'Free: ${(freeMB / 1024).toStringAsFixed(1)} GB / ${(totalMB / 1024).toStringAsFixed(1)} GB',
+                'Free: ${_formatStorageGB(freeBytes)} / ${_formatStorageGB(totalBytes)}',
                 style: TextStyle(fontSize: 12, color: cs.onSurface.withValues(alpha: 0.7)),
               ),
             ],
@@ -471,9 +471,11 @@ class _DownloadTabState extends State<DownloadTab> {
                   Row(
                     children: [
                       Expanded(
-                        flex: 3,
+                        flex: 4,
                         child: Text(
-                          '${_formatBytes(item.downloadedBytes)} / ${_formatBytes(item.totalBytes)} (${(item.progress * 100).toInt()}%)',
+                          item.status == DownloadStatus.downloading
+                              ? '${_formatCompactBytes(item.downloadedBytes)}/${_formatCompactBytes(item.totalBytes)} (${(item.progress * 100).toInt()}%)'
+                              : '${_formatBytes(item.downloadedBytes)} / ${_formatBytes(item.totalBytes)}',
                           style: TextStyle(
                               fontSize: isNested ? 10 : 11,
                               fontWeight: FontWeight.bold,
@@ -483,7 +485,7 @@ class _DownloadTabState extends State<DownloadTab> {
                       ),
                       const SizedBox(width: 4),
                       Expanded(
-                        flex: 3,
+                        flex: 4,
                         child: Text(
                           _formatSpeedAndETA(item),
                           textAlign: TextAlign.center,
@@ -859,10 +861,26 @@ class _DownloadTabState extends State<DownloadTab> {
     return '${(bytes / pow(1024, i)).toStringAsFixed(1)} ${suffixes[i]}';
   }
 
+  String _formatCompactBytes(int bytes) {
+    if (bytes <= 0) return '0B';
+    const suffixes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    var i = (log(bytes) / log(1024)).floor();
+    var val = bytes / pow(1024, i);
+    if (val >= 100) {
+      return '${val.toStringAsFixed(0)}${suffixes[i]}';
+    }
+    return '${val.toStringAsFixed(1)}${suffixes[i]}';
+  }
+
+  String _formatStorageGB(int bytes) {
+    if (bytes <= 0) return '0 GB';
+    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
+  }
+
   String _formatSpeedAndETA(DownloadItem item) {
     if (item.status == DownloadStatus.done) return 'Completed';
     if (item.status == DownloadStatus.error) return 'Failed';
-    if (item.speedBytesPerSec == 0) return '0 B/s | ETA: --';
+    if (item.speedBytesPerSec <= 0) return '0 B/s';
 
     String speedStr = '';
     if (item.speedBytesPerSec > 1024 * 1024) {
@@ -879,8 +897,15 @@ class _DownloadTabState extends State<DownloadTab> {
     int hh = mm ~/ 60;
     mm = mm % 60;
 
-    String etaStr = hh > 0 ? '${hh}h ${mm}m ${ss}s' : '${mm}m ${ss}s';
+    String etaStr;
+    if (hh > 0) {
+      etaStr = '${hh}h ${mm}m';
+    } else if (mm > 0) {
+      etaStr = '${mm}m ${ss}s';
+    } else {
+      etaStr = '${ss}s';
+    }
 
-    return '$speedStr | ETA: $etaStr';
+    return '$speedStr \u00b7 $etaStr';
   }
 }

@@ -14,6 +14,7 @@ class DownloadManager: NSObject {
     private var saveDirMap: [String: String] = [:]
     private var retryCountMap: [String: Int] = [:]
     private var downloadUrlMap: [String: String] = [:]
+    private var fileNameMap: [String: String] = [:]
     private let maxRetries = 3
     private var proxyHost: String = ""
     private var proxyPort: Int = 0
@@ -86,6 +87,7 @@ class DownloadManager: NSObject {
             saveDirMap[downloadId] = dir
         }
         downloadUrlMap[downloadId] = url
+        fileNameMap[downloadId] = fileName
         guard let downloadUrl = URL(string: url) else {
             sendEvent(type: "error", downloadId: downloadId, data: ["message": "Invalid URL"])
             return
@@ -142,6 +144,7 @@ class DownloadManager: NSObject {
         resumeDataMap.removeValue(forKey: downloadId)
         progressMap.removeValue(forKey: downloadId)
         retryCountMap.removeValue(forKey: downloadId)
+        fileNameMap.removeValue(forKey: downloadId)
         endLiveActivity(downloadId: downloadId, status: "Cancelled")
         sendEvent(type: "cancelled", downloadId: downloadId, data: [:])
     }
@@ -153,6 +156,7 @@ class DownloadManager: NSObject {
             resumeDataMap.removeValue(forKey: id)
             progressMap.removeValue(forKey: id)
             retryCountMap.removeValue(forKey: id)
+            fileNameMap.removeValue(forKey: id)
             endLiveActivity(downloadId: id, status: "Cancelled")
         }
         activeTasks.removeAll()
@@ -223,12 +227,13 @@ class DownloadManager: NSObject {
     private func updateLiveActivity(downloadId: String, received: Int64, total: Int64) {
         guard #available(iOS 16.2, *),
               let activity = liveActivities[downloadId] else { return }
+        let fileName = fileNameMap[downloadId] ?? "Download"
         let state = DownloadActivityAttributes.ContentState(
-            fileName: activity.attributes.downloadId,
+            fileName: fileName,
             receivedBytes: received,
             totalBytes: total,
             progress: total > 0 ? Double(received) / Double(total) : 0,
-            status: total > 0 ? "Downloading... \(Int(Double(received) / Double(total) * 100))%" : "Downloading..."
+            status: total > 0 ? "\(Int(Double(received) / Double(total) * 100))%" : "Downloading..."
         )
         Task {
             await activity.update(using: state)
@@ -300,8 +305,8 @@ extension DownloadManager: URLSessionDownloadDelegate {
         let fileName = String(parts[1])
 
         let destinationDir: URL
-        if let customDir = saveDirMap[downloadId], let customUrl = URL(string: "file://\(customDir)") {
-            destinationDir = customUrl
+        if let customDir = saveDirMap[downloadId] {
+            destinationDir = URL(fileURLWithPath: customDir)
         } else {
             let documentsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
             destinationDir = documentsDir.appendingPathComponent("DirXplore", isDirectory: true)
@@ -326,6 +331,7 @@ extension DownloadManager: URLSessionDownloadDelegate {
         taskIdMap.removeValue(forKey: downloadTask.taskIdentifier)
         progressMap.removeValue(forKey: downloadId)
         retryCountMap.removeValue(forKey: downloadId)
+        fileNameMap.removeValue(forKey: downloadId)
     }
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {

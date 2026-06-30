@@ -30,10 +30,17 @@ struct DownloadLiveActivity: Widget {
                         .foregroundColor(.white)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
-                    ProgressView(value: context.state.progress)
-                        .tint(.blue)
-                        .padding(.horizontal, 8)
-                        .padding(.bottom, 4)
+                    VStack(spacing: 4) {
+                        ProgressView(value: context.state.progress)
+                            .tint(.blue)
+                        if context.state.totalBytes > 0 {
+                            Text("\(formatBytes(context.state.receivedBytes)) / \(formatBytes(context.state.totalBytes))")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.bottom, 4)
                 }
             } compactLeading: {
                 compactLeadingView(context: context)
@@ -59,7 +66,7 @@ struct DownloadLiveActivity: Widget {
     }
 
     private func compactTrailingView(context: ActivityViewContext<DownloadActivityAttributes>) -> some View {
-        Text(context.state.fileName)
+        Text(context.state.status)
             .font(.caption2)
             .lineLimit(1)
             .foregroundColor(.secondary)
@@ -68,6 +75,13 @@ struct DownloadLiveActivity: Widget {
     private func minimalView(context: ActivityViewContext<DownloadActivityAttributes>) -> some View {
         Image(systemName: "arrow.down.circle")
             .foregroundColor(.blue)
+    }
+
+    private func formatBytes(_ bytes: Int64) -> String {
+        if bytes < 1024 { return "\(bytes) B" }
+        if bytes < 1024 * 1024 { return String(format: "%.1f KB", Double(bytes) / 1024) }
+        if bytes < 1024 * 1024 * 1024 { return String(format: "%.1f MB", Double(bytes) / (1024 * 1024)) }
+        return String(format: "%.1f GB", Double(bytes) / (1024 * 1024 * 1024))
     }
 }
 

@@ -75,6 +75,7 @@ class DownloadProvider with ChangeNotifier {
           debugPrint('iOS save path: $path');
         }
       }).catchError((e) { debugPrint('Channel method error: $e'); });
+      enableLiveActivity();
     }
   }
 
@@ -162,7 +163,6 @@ class DownloadProvider with ChangeNotifier {
         _processQueue();
         break;
       case 'resumed':
-        _activeCount++;
         item.status = DownloadStatus.downloading;
         notifyListeners();
         break;
@@ -640,19 +640,32 @@ class DownloadProvider with ChangeNotifier {
   }
 
   Future<void> _startDownload(DownloadItem item) async {
+    // iOS: delegate to native downloader via method channel
+    if (_isIOS) {
+      _activeCount++;
+      item.status = DownloadStatus.downloading;
+      notifyListeners();
+      await DatabaseHelper().updateDownload(item);
+      _iosChannel.invokeMethod('startDownload', {
+        'url': item.url,
+        'fileName': item.fileName,
+        'downloadId': item.id,
+        'saveDir': p.dirname(item.savePath),
+      }).catchError((e) { debugPrint('Channel method error: $e'); });
+      return;
+    }
+
     _activeCount++;
     item.status = DownloadStatus.downloading;
     notifyListeners();
     await DatabaseHelper().updateDownload(item);
 
-    // Start Foreground Service (Android only)
-    if (!_isIOS) {
-      _channel.invokeMethod('startForegroundService', {
-        'url': item.url,
-        'filename': item.fileName,
-        'id': 1001,
-      }).catchError((e) { debugPrint('Channel method error: $e'); });
-    }
+    // Start Foreground Service (Android)
+    _channel.invokeMethod('startForegroundService', {
+      'url': item.url,
+      'filename': item.fileName,
+      'id': 1001,
+    }).catchError((e) { debugPrint('Channel method error: $e'); });
 
     final cancelToken = CancelToken();
     _cancelTokens[item.id] = cancelToken;

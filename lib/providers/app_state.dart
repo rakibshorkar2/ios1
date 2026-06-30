@@ -92,7 +92,7 @@ class AppState with ChangeNotifier {
     _maxConcurrentDownloads = prefs.getInt('maxConcurrent') ?? 1;
 
     // Load Added Feature Toggles
-    _trueAmoledDark = prefs.getBool('trueAmoledDark') ?? false;
+    _trueAmoledDark = prefs.getBool('trueAmoledDark') ?? true;
     _showDownloadNotifications =
         prefs.getBool('showDownloadNotifications') ?? true;
     _speedLimitCap = prefs.getInt('speedLimitCap') ?? 0;
