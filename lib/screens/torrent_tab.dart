@@ -81,15 +81,22 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
       builder: (ctx) => _buildGlassDialog(
         title: 'Magnet Link Detected',
         icon: Icons.link_rounded,
-        iconColor: Colors.blue,
-        content: 'A magnet link was found in your clipboard. Would you like to add it to your downloads?',
-        actions: [
+        iconColor: Colors.green,
+        customContent: Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Text('A magnet link was found in your clipboard. Would you like to add it to your downloads?',
+              style: TextStyle(
+                  fontSize: 14,
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                  height: 1.4)),
+        ),
+        dialogActions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child: Text('Ignore',
                 style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6))),
           ),
-          _buildGlassButton(
+          _glassButton(
             label: 'Add Torrent',
             onPressed: () {
               Navigator.pop(ctx);
@@ -154,8 +161,8 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
     required String title,
     required IconData icon,
     required Color iconColor,
-    required String content,
-    required List<Widget> actions,
+    Widget? customContent,
+    List<Widget> dialogActions = const [],
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return AlertDialog(
@@ -202,19 +209,17 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
                   ],
                 ),
                 const SizedBox(height: 16),
-                Text(content,
-                    style: TextStyle(
-                        fontSize: 14,
-                        color: Theme.of(context)
-                            .colorScheme
-                            .onSurface
-                            .withValues(alpha: 0.7),
-                        height: 1.4)),
-                const SizedBox(height: 24),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: actions,
-                ),
+                if (customContent != null)
+                  customContent
+                else
+                  const SizedBox.shrink(),
+                if (dialogActions.isNotEmpty) ...[
+                  const SizedBox(height: 24),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: dialogActions,
+                  ),
+                ],
               ],
             ),
           ),
@@ -952,8 +957,6 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
           title: 'Add Torrent',
           icon: Icons.download_rounded,
           iconColor: Theme.of(context).colorScheme.primary,
-          content: '',
-          actions: [],
           customContent: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1307,8 +1310,6 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
           title: 'Add Torrent Link',
           icon: Icons.link,
           iconColor: Theme.of(context).colorScheme.primary,
-          content: '',
-          actions: [],
           customContent: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -1577,7 +1578,7 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
                                   child: Row(
                                     children: [
                                       Icon(
-                                        e.value.toLowerCase().contains(RegExp(r'\.(mp4|mkv|avi|mov)$'))
+                                        e.value.name.toLowerCase().contains(RegExp(r'\.(mp4|mkv|avi|mov)$'))
                                             ? Icons.video_file_rounded
                                             : Icons.insert_drive_file_rounded,
                                         size: 16,
@@ -1622,16 +1623,62 @@ class _TorrentTabState extends State<TorrentTab> with WidgetsBindingObserver {
     );
   }
 
-  void _handleStream(BuildContext context, String id, String name) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => MediaPlayerScreen(
-          torrentId: id,
-          title: name,
-        ),
-      ),
+  Future<void> _handleStream(BuildContext context, String id, String title,
+      {String? filePath}) async {
+    final provider = context.read<TorrentProvider>();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Starting streaming server...')),
     );
+
+    final url = await provider.startStreaming(id, filePath: filePath);
+    if (url != null && context.mounted) {
+      final allFiles = provider.getTaskFiles(id);
+      final videoFiles = allFiles.where((f) {
+        final name = f.name.toLowerCase();
+        return name.endsWith('.mp4') ||
+            name.endsWith('.mkv') ||
+            name.endsWith('.avi') ||
+            name.endsWith('.mov') ||
+            name.endsWith('.wmv') ||
+            name.endsWith('.flv');
+      }).toList();
+
+      List<Map<String, String>> playlist = [];
+      int initialIndex = 0;
+
+      if (videoFiles.isEmpty) {
+        playlist = [{'url': url, 'title': title}];
+      } else {
+        playlist = videoFiles.map((f) {
+          final fileUrl = 'http://127.0.0.1:9090/${Uri.encodeComponent(f.path)}';
+          return {'url': fileUrl, 'title': f.name};
+        }).toList();
+
+        if (filePath != null) {
+          initialIndex = videoFiles.indexWhere((f) => f.path == filePath);
+          if (initialIndex == -1) initialIndex = 0;
+        } else {
+          initialIndex = playlist.indexWhere((item) => item['url'] == url);
+          if (initialIndex == -1) initialIndex = 0;
+        }
+      }
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => MediaPlayerScreen(
+            url: playlist[initialIndex]['url']!,
+            title: playlist[initialIndex]['title']!,
+            playlist: playlist,
+            initialIndex: initialIndex,
+          ),
+        ),
+      );
+    } else if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to start streaming.')),
+      );
+    }
   }
 }
 
