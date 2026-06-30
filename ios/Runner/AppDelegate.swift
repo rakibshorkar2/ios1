@@ -20,7 +20,7 @@ import UIKit
         )
 
         downloadChannel.setMethodCallHandler { [weak self] (call, result) in
-            guard self != nil else { return }
+            guard let self = self else { return }
             switch call.method {
             case "startDownload":
                 if let args = call.arguments as? [String: Any],
@@ -59,9 +59,9 @@ import UIKit
             case "getSavePath":
                 if let persistentURL = DownloadManager.shared.persistentFolderURL {
                     result(persistentURL.path)
-                } else {
-                    fallbackToDefaultSavePath(result)
-                }
+                    } else {
+                        self.fallbackToDefaultSavePath(result)
+                    }
 
             case "openFileLocation":
                 if let args = call.arguments as? [String: Any],
@@ -105,15 +105,15 @@ import UIKit
                 }
 
             case "pickDownloadFolder":
-                pendingFolderPickerResult = result
+                self.pendingFolderPickerResult = result
                 DispatchQueue.main.async {
                     if let rootVC = UIApplication.shared.keyWindow?.rootViewController {
                         let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.folder])
                         picker.delegate = self
                         rootVC.present(picker, animated: true)
                     } else {
-                        self?.pendingFolderPickerResult?(nil)
-                        self?.pendingFolderPickerResult = nil
+                        self.pendingFolderPickerResult?(nil)
+                        self.pendingFolderPickerResult = nil
                     }
                 }
 
