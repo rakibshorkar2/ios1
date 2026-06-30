@@ -618,6 +618,7 @@ class DownloadProvider with ChangeNotifier {
     notifyListeners();
     await DatabaseHelper().updateDownload(item);
     _liveActivityStart(item.id, item.fileName);
+    _showiOSNotification("Download Started", item.fileName);
 
     // Start Foreground Service (Android only)
     if (!_isIOS) {

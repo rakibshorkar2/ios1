@@ -85,7 +85,10 @@ class DownloadManager: NSObject {
     }
 
     private func createSession() -> URLSession {
-        let config = URLSessionConfiguration.default
+        let config = URLSessionConfiguration.background(withIdentifier: "com.dirxplore.background.download")
+        config.isDiscretionary = false
+        config.sessionSendsLaunchEvents = true
+        config.shouldUseExtendedBackgroundIdleMode = true
         config.allowsCellularAccess = true
         if #available(iOS 13.0, *) {
             config.allowsExpensiveNetworkAccess = true
@@ -457,6 +460,13 @@ extension DownloadManager: URLSessionDownloadDelegate {
                     retryCountMap.removeValue(forKey: downloadId)
                 }
             }
+        }
+    }
+
+    func urlSessionDidFinishEvents(forBackgroundURLSession session: URLSession) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            self.backgroundCompletionHandler?()
+            self.backgroundCompletionHandler = nil
         }
     }
 
