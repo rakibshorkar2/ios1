@@ -53,7 +53,7 @@ class DownloadManager: NSObject {
         persistentFolderURL?.stopAccessingSecurityScopedResource()
     }
 
-    private var persistentFolderURL: URL?
+    var persistentFolderURL: URL?
 
     private func resolvePersistentDownloadFolder() {
         guard let bookmarkData = UserDefaults.standard.data(forKey: "persistentDownloadFolderBookmark") else { return }
