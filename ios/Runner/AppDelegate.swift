@@ -228,12 +228,16 @@ extension AppDelegate: UIDocumentPickerDelegate {
             pendingFolderPickerResult = nil
             return
         }
-        let accessOK = url.startAccessingSecurityScopedResource()
-        defer { if accessOK { url.stopAccessingSecurityScopedResource() } }
+        // Keep security-scoped access open for current session
+        guard url.startAccessingSecurityScopedResource() else {
+            pendingFolderPickerResult?(nil)
+            pendingFolderPickerResult = nil
+            return
+        }
+        DownloadManager.shared.persistentFolderURL = url
         do {
             let bookmarkData = try url.bookmarkData(options: .minimalBookmark, includingResourceValuesForKeys: nil, relativeTo: nil)
             UserDefaults.standard.set(bookmarkData, forKey: "persistentDownloadFolderBookmark")
-            UserDefaults.standard.set(url.path, forKey: "persistentDownloadFolderPath")
             pendingFolderPickerResult?(url.path)
         } catch {
             pendingFolderPickerResult?(nil)

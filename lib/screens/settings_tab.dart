@@ -98,12 +98,33 @@ class SettingsTab extends StatelessWidget {
                       icon: const Icon(Icons.folder_open),
                       onPressed: () async {
                         if (Platform.isIOS) {
+                          final picked = await showDialog<bool>(
+                            context: context,
+                            builder: (ctx) => AlertDialog(
+                              title: const Text('Persistent Download Folder'),
+                              content: const Text(
+                                'Choose a folder outside the app sandbox (e.g. "On My iPhone" or iCloud Drive) so downloads survive app deletion.\n\n'
+                                'The default Documents folder is deleted with the app.',
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(ctx, false),
+                                  child: const Text('Cancel'),
+                                ),
+                                TextButton(
+                                  onPressed: () => Navigator.pop(ctx, true),
+                                  child: const Text('Choose Folder'),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (picked != true) return;
                           final path = await appState.pickDownloadFolder();
                           if (path != null && context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                content: Text('Downloads will be saved to $path'),
-                                duration: const Duration(seconds: 3),
+                                content: Text('Downloads will now save to a persistent folder outside the app sandbox.'),
+                                duration: const Duration(seconds: 4),
                               ),
                             );
                           }
