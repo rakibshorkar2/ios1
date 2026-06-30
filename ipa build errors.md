@@ -2,7 +2,7 @@ Run flutter build ios --release --no-codesign
   
 Warning: Building for device with codesigning disabled. You will have to manually codesign before deploying to device.
 Building com.example.dirBrowser for device (ios-release)...
-Adding Swift Package Manager integration...                        28.2s
+Adding Swift Package Manager integration...                        27.2s
 The following plugins do not support Swift Package Manager for ios:
   - flutter_background_service_ios
   - flutter_inappwebview_ios
@@ -14,9 +14,9 @@ The following plugins do not support Swift Package Manager for ios:
   - volume_controller
   - workmanager_apple
 This will become an error in a future version of Flutter. Please contact the plugin maintainers to request Swift Package Manager adoption.
-Running pod install...                                              6.6s
+Running pod install...                                              4.6s
 Running Xcode build...                                          
-Xcode build done.                                           103.5s
+Xcode build done.                                           93.3s
 Failed to build iOS app
 ════════════════════════════════════════════════════════════════════════════════
 Building a deployable iOS app requires a selected Development Team with a 
