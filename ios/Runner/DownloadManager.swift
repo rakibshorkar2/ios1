@@ -21,6 +21,7 @@ class DownloadManager: NSObject {
     private var proxyUsername: String = ""
     private var proxyPassword: String = ""
     private var proxyEnabled: Bool = false
+    private var proxyProtocol: String = "http"
     private var liveActivities: [String: Activity<DownloadActivityAttributes>] = [:]
     var liveActivityEnabled: Bool = true
     var backgroundCompletionHandler: (() -> Void)?
@@ -64,14 +65,17 @@ class DownloadManager: NSObject {
         }
     }
 
-    func setProxy(host: String, port: Int, username: String, password: String, enabled: Bool) {
+    func setProxy(host: String, port: Int, username: String, password: String, enabled: Bool, protocol proto: String = "http") {
         proxyHost = host
         proxyPort = port
         proxyUsername = username
         proxyPassword = password
         proxyEnabled = enabled
-        // Never invalidate background session — it kills pending system tasks from previous launches.
-        // Proxy changes take effect on next app launch where a new session is created.
+        proxyProtocol = proto.lowercased()
+        // Recreate session with new proxy if no active downloads
+        guard activeTasks.isEmpty else { return }
+        backgroundSession.invalidateAndCancel()
+        backgroundSession = createSession()
     }
 
     private func createSession() -> URLSession {
@@ -91,14 +95,42 @@ class DownloadManager: NSObject {
         }
         config.timeoutIntervalForResource = 604800 // 7 days max for entire resource
         if proxyEnabled && !proxyHost.isEmpty && proxyPort > 0 {
-            var proxyDict: [String: Any] = [
-                "SOCKSEnable": 1,
-                "SOCKSProxy": proxyHost,
-                "SOCKSPort": proxyPort,
-            ]
-            if !proxyUsername.isEmpty {
-                proxyDict["SOCKSUser"] = proxyUsername
-                proxyDict["SOCKSPassword"] = proxyPassword
+            var proxyDict: [String: Any]
+            switch proxyProtocol {
+            case "socks5", "socks4":
+                proxyDict = [
+                    "SOCKSEnable": 1,
+                    "SOCKSProxy": proxyHost,
+                    "SOCKSPort": proxyPort,
+                ]
+                if !proxyUsername.isEmpty {
+                    proxyDict["SOCKSUser"] = proxyUsername
+                    proxyDict["SOCKSPassword"] = proxyPassword
+                }
+            case "https":
+                proxyDict = [
+                    "HTTPSEnable": 1,
+                    "HTTPSProxy": proxyHost,
+                    "HTTPSPort": proxyPort,
+                ]
+                if !proxyUsername.isEmpty {
+                    proxyDict["HTTPSUser"] = proxyUsername
+                    proxyDict["HTTPSPassword"] = proxyPassword
+                }
+            default: // http
+                proxyDict = [
+                    "HTTPEnable": 1,
+                    "HTTPProxy": proxyHost,
+                    "HTTPPort": proxyPort,
+                ]
+                if !proxyUsername.isEmpty {
+                    proxyDict["HTTPUser"] = proxyUsername
+                    proxyDict["HTTPPassword"] = proxyPassword
+                }
+                // Also set HTTPS to same proxy for HTTPS URLs
+                proxyDict["HTTPSEnable"] = 1
+                proxyDict["HTTPSProxy"] = proxyHost
+                proxyDict["HTTPSPort"] = proxyPort
             }
             config.connectionProxyDictionary = proxyDict
         }

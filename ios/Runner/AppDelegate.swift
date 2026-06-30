@@ -192,8 +192,9 @@ import UIKit
                     let port = args["port"] as? Int ?? 0
                     let username = args["username"] as? String ?? ""
                     let password = args["password"] as? String ?? ""
+                    let protocolStr = args["protocol"] as? String ?? "http"
                     let enabled = args["enabled"] as? Bool ?? false
-                    DownloadManager.shared.setProxy(host: host, port: port, username: username, password: password, enabled: enabled)
+                    DownloadManager.shared.setProxy(host: host, port: port, username: username, password: password, enabled: enabled, protocol: protocolStr)
                 }
                 result(nil)
             default:
