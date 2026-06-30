@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
@@ -6,6 +7,8 @@ import 'dart:io' show Platform;
 import '../services/torrent_service.dart';
 
 class AppState with ChangeNotifier {
+  static const MethodChannel _iosChannel =
+      MethodChannel('com.dirxplore/ios_download');
   ThemeMode _themeMode = ThemeMode.system;
   String _defaultSavePath = '';
   int _maxConcurrentDownloads = 1;
@@ -72,6 +75,14 @@ class AppState with ChangeNotifier {
     if (_defaultSavePath.isEmpty) {
       if (Platform.isAndroid) {
         _defaultSavePath = '/storage/emulated/0/Download/DirXplore';
+      } else if (Platform.isIOS) {
+        try {
+          final path = await _iosChannel.invokeMethod<String>('getSavePath');
+          _defaultSavePath = path ?? '${(await getApplicationDocumentsDirectory()).path}/DirXplore';
+        } catch (_) {
+          final dir = await getApplicationDocumentsDirectory();
+          _defaultSavePath = '${dir.path}/DirXplore';
+        }
       } else {
         try {
           final dir = await getApplicationDocumentsDirectory();
@@ -142,6 +153,23 @@ class AppState with ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('savePath', path);
+  }
+
+  Future<String?> pickDownloadFolder() async {
+    if (!Platform.isIOS) return null;
+    try {
+      final path = await _iosChannel.invokeMethod<String>('pickDownloadFolder');
+      if (path != null && path.isNotEmpty) {
+        _defaultSavePath = path;
+        notifyListeners();
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('savePath', path);
+      }
+      return path;
+    } catch (e) {
+      debugPrint('pickDownloadFolder error: $e');
+      return null;
+    }
   }
 
   Future<void> setMaxConcurrentDownloads(int max) async {

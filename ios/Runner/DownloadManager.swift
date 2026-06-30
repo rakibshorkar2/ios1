@@ -46,6 +46,22 @@ class DownloadManager: NSObject {
     private override init() {
         super.init()
         backgroundSession = createSession()
+        resolvePersistentDownloadFolder()
+    }
+
+    deinit {
+        persistentFolderURL?.stopAccessingSecurityScopedResource()
+    }
+
+    private var persistentFolderURL: URL?
+
+    private func resolvePersistentDownloadFolder() {
+        guard let bookmarkData = UserDefaults.standard.data(forKey: "persistentDownloadFolderBookmark") else { return }
+        var isStale = false
+        guard let url = try? URL(resolvingBookmarkData: bookmarkData, options: .withoutUI, relativeTo: nil, bookmarkDataIsStale: &isStale) else { return }
+        if url.startAccessingSecurityScopedResource() {
+            persistentFolderURL = url
+        }
     }
 
     func setProxy(host: String, port: Int, username: String, password: String, enabled: Bool) {
@@ -319,6 +335,8 @@ extension DownloadManager: URLSessionDownloadDelegate {
         let destinationDir: URL
         if let customDir = saveDirMap[downloadId] {
             destinationDir = URL(fileURLWithPath: customDir)
+        } else if let persistentURL = persistentFolderURL {
+            destinationDir = persistentURL
         } else {
             let documentsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
             destinationDir = documentsDir.appendingPathComponent("DirXplore", isDirectory: true)

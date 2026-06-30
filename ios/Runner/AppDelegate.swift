@@ -3,6 +3,7 @@ import UIKit
 
 @main
 @objc class AppDelegate: FlutterAppDelegate {
+    var pendingFolderPickerResult: FlutterResult?
     override func application(
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
@@ -56,10 +57,11 @@ import UIKit
                 result(true)
 
             case "getSavePath":
-                let documentsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-                let dirXploreDir = documentsDir.appendingPathComponent("DirXplore", isDirectory: true)
-                try? FileManager.default.createDirectory(at: dirXploreDir, withIntermediateDirectories: true)
-                result(dirXploreDir.path)
+                if let persistentURL = DownloadManager.shared.persistentFolderURL {
+                    result(persistentURL.path)
+                } else {
+                    fallbackToDefaultSavePath(result)
+                }
 
             case "openFileLocation":
                 if let args = call.arguments as? [String: Any],
@@ -100,6 +102,38 @@ import UIKit
                     result(true)
                 } else {
                     result(FlutterError(code: "INVALID_ARGS", message: "Missing path", details: nil))
+                }
+
+            case "pickDownloadFolder":
+                pendingFolderPickerResult = result
+                DispatchQueue.main.async {
+                    if let rootVC = UIApplication.shared.keyWindow?.rootViewController {
+                        let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.folder])
+                        picker.delegate = self
+                        rootVC.present(picker, animated: true)
+                    } else {
+                        self?.pendingFolderPickerResult?(nil)
+                        self?.pendingFolderPickerResult = nil
+                    }
+                }
+
+            case "getPersistentDownloadFolder":
+                guard let bookmarkData = UserDefaults.standard.data(forKey: "persistentDownloadFolderBookmark") else {
+                    result(nil)
+                    return
+                }
+                var isStale = false
+                do {
+                    let url = try URL(resolvingBookmarkData: bookmarkData, options: .withoutUI, relativeTo: nil, bookmarkDataIsStale: &isStale)
+                    if isStale {
+                        let accessOK = url.startAccessingSecurityScopedResource()
+                        defer { if accessOK { url.stopAccessingSecurityScopedResource() } }
+                        let newBookmark = try url.bookmarkData(options: .minimalBookmark, includingResourceValuesForKeys: nil, relativeTo: nil)
+                        UserDefaults.standard.set(newBookmark, forKey: "persistentDownloadFolderBookmark")
+                    }
+                    result(url.path)
+                } catch {
+                    result(nil)
                 }
 
             default:
@@ -176,5 +210,38 @@ import UIKit
         completionHandler: @escaping () -> Void
     ) {
         DownloadManager.shared.backgroundCompletionHandler = completionHandler
+    }
+
+    private func fallbackToDefaultSavePath(_ result: FlutterResult) {
+        let documentsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        let dirXploreDir = documentsDir.appendingPathComponent("DirXplore", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dirXploreDir, withIntermediateDirectories: true)
+        result(dirXploreDir.path)
+    }
+}
+
+extension AppDelegate: UIDocumentPickerDelegate {
+    func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+        guard let url = urls.first else {
+            pendingFolderPickerResult?(nil)
+            pendingFolderPickerResult = nil
+            return
+        }
+        let accessOK = url.startAccessingSecurityScopedResource()
+        defer { if accessOK { url.stopAccessingSecurityScopedResource() } }
+        do {
+            let bookmarkData = try url.bookmarkData(options: .minimalBookmark, includingResourceValuesForKeys: nil, relativeTo: nil)
+            UserDefaults.standard.set(bookmarkData, forKey: "persistentDownloadFolderBookmark")
+            UserDefaults.standard.set(url.path, forKey: "persistentDownloadFolderPath")
+            pendingFolderPickerResult?(url.path)
+        } catch {
+            pendingFolderPickerResult?(nil)
+        }
+        pendingFolderPickerResult = nil
+    }
+
+    func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+        pendingFolderPickerResult?(nil)
+        pendingFolderPickerResult = nil
     }
 }

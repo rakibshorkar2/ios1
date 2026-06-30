@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
+import 'dart:io' show Platform;
 import 'dart:ui';
 import '../providers/app_state.dart';
 import 'security_setup_screen.dart';
@@ -96,10 +97,22 @@ class SettingsTab extends StatelessWidget {
                     trailing: IconButton(
                       icon: const Icon(Icons.folder_open),
                       onPressed: () async {
-                        String? selectedDirectory =
-                            await FilePicker.platform.getDirectoryPath();
-                        if (selectedDirectory != null) {
-                          appState.setDefaultSavePath(selectedDirectory);
+                        if (Platform.isIOS) {
+                          final path = await appState.pickDownloadFolder();
+                          if (path != null && context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Downloads will be saved to $path'),
+                                duration: const Duration(seconds: 3),
+                              ),
+                            );
+                          }
+                        } else {
+                          String? selectedDirectory =
+                              await FilePicker.platform.getDirectoryPath();
+                          if (selectedDirectory != null) {
+                            appState.setDefaultSavePath(selectedDirectory);
+                          }
                         }
                       },
                     ),
