@@ -87,6 +87,21 @@ import UIKit
                 }
                 result(nil)
 
+            case "saveToFiles":
+                if let args = call.arguments as? [String: Any],
+                   let path = args["path"] as? String {
+                    let fileURL = URL(fileURLWithPath: path)
+                    DispatchQueue.main.async {
+                        if let rootVC = UIApplication.shared.keyWindow?.rootViewController {
+                            let docPicker = UIDocumentPickerViewController(forExporting: [fileURL], asCopy: true)
+                            rootVC.present(docPicker, animated: true)
+                        }
+                    }
+                    result(true)
+                } else {
+                    result(FlutterError(code: "INVALID_ARGS", message: "Missing path", details: nil))
+                }
+
             default:
                 result(FlutterMethodNotImplemented)
             }

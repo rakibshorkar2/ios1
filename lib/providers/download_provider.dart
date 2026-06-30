@@ -998,6 +998,13 @@ class DownloadProvider with ChangeNotifier {
           .catchError((e) { debugPrint('revealFile error: $e'); });
     }
   }
+
+  void saveToFiles(String path) {
+    if (_isIOS) {
+      _iosChannel.invokeMethod('saveToFiles', {'path': path})
+          .catchError((e) { debugPrint('saveToFiles error: $e'); });
+    }
+  }
 }
 
 // Helper for older dart runtimes if bind() isn't available, but bind() is standard.

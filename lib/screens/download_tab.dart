@@ -651,6 +651,23 @@ class _DownloadTabState extends State<DownloadTab> {
                     }
                   },
                 ),
+              if (Platform.isIOS)
+                IconButton(
+                  icon: Icon(Icons.save_alt, color: cs.tertiary, size: 20),
+                  constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                  tooltip: 'Save to Files',
+                  onPressed: () {
+                    HapticService.light();
+                    final file = File(item.savePath);
+                    if (file.existsSync()) {
+                      dlProvider.saveToFiles(item.savePath);
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('File not found on disk.')),
+                      );
+                    }
+                  },
+                ),
             ],
           ),
         if (item.status == DownloadStatus.downloading ||
@@ -872,10 +889,10 @@ class _DownloadTabState extends State<DownloadTab> {
     return '${val.toStringAsFixed(1)}${suffixes[i]}';
   }
 
-  String _formatStorageGB(dynamic bytes) {
-    final b = (bytes is int ? bytes.toDouble() : bytes) as double;
+  String _formatStorageGB(dynamic mb) {
+    final b = (mb is int ? mb.toDouble() : mb) as double;
     if (b <= 0) return '0 GB';
-    return '${(b / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
+    return '${(b / 1024).toStringAsFixed(1)} GB';
   }
 
   String _formatSpeedAndETA(DownloadItem item) {

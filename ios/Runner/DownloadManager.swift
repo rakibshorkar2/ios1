@@ -54,10 +54,8 @@ class DownloadManager: NSObject {
         proxyUsername = username
         proxyPassword = password
         proxyEnabled = enabled
-        // Only recreate session if no active tasks — invalidating kills all downloads
-        guard activeTasks.isEmpty else { return }
-        backgroundSession.invalidateAndCancel()
-        backgroundSession = createSession()
+        // Never invalidate background session — it kills pending system tasks from previous launches.
+        // Proxy changes take effect on next app launch where a new session is created.
     }
 
     private func createSession() -> URLSession {
@@ -94,6 +92,9 @@ class DownloadManager: NSObject {
     func startDownload(url: String, fileName: String, downloadId: String, saveDir: String? = nil) {
         if let dir = saveDir {
             saveDirMap[downloadId] = dir
+            // Pre-create the download directory so it exists when file arrives
+            let dirURL = URL(fileURLWithPath: dir)
+            try? FileManager.default.createDirectory(at: dirURL, withIntermediateDirectories: true)
         }
         downloadUrlMap[downloadId] = url
         fileNameMap[downloadId] = fileName
